@@ -91,6 +91,9 @@ class HueMover {
   private ladderMove: LadderMove | null = null;
   private speedSmoothed = 0;
   private lastKick = new Map<number, number>();
+  private ladderLeftBottom = false;
+  /** Just stepped off the ladder: don't re-grab it until the stick/keys are let go. */
+  private ladderNeedsRelease = false;
   /** Whether autostep currently ignores dynamic bodies (true while running). */
   private autostepDynamic = false;
   private ladder: Ladder | null;
@@ -207,12 +210,13 @@ class HueMover {
       dirX /= l;
       dirZ /= l;
     }
+    if (mag < 0.1) this.ladderNeedsRelease = false;
     const jumpPressed = input.jump && !this.prevJump;
     this.prevJump = input.jump;
     if (jumpPressed) this.jumpPressedAt = this.now;
 
     if (this.mode === "climb") return this.updateClimb(dt, dirX, dirZ, mag);
-    if (this.mode === "ladder") return this.updateLadder(dt, dirX, dirZ, mag, jumpPressed);
+    if (this.mode === "ladder") return this.updateLadder(dt, dirX, dirZ, mag, jumpPressed, input.moveZ);
 
     const locked = this.landing !== null && this.landing.t < this.landing.lock;
     const inputMag = locked ? 0 : mag;
@@ -504,7 +508,7 @@ class HueMover {
 
   private tryLadder(dirX: number, dirZ: number) {
     const L = this.ladder;
-    if (!L) return false;
+    if (!L || this.ladderNeedsRelease) return false;
     const f = this.feet;
     const toward = dirX * L.facing.x + dirZ * L.facing.z;
     const lateral = (f.x - L.line.x) * L.facing.z - (f.z - L.line.z) * L.facing.x; // signed distance across
@@ -536,6 +540,7 @@ class HueMover {
   private enterLadder() {
     const L = this.ladder!;
     this.mode = "ladder";
+    this.ladderLeftBottom = false;
     this.vel.set(0, 0, 0);
     this.landing = null;
     this.yaw = yawFor(L.facing.x, L.facing.z);
@@ -554,7 +559,7 @@ class HueMover {
     return 0.14; // prompt default
   }
 
-  private updateLadder(dt: number, dirX: number, dirZ: number, mag: number, jumpPressed: boolean) {
+  private updateLadder(dt: number, dirX: number, dirZ: number, mag: number, jumpPressed: boolean, screenUp: number) {
     const L = this.ladder!;
     const mv = this.ladderMove;
     if (mv) {
@@ -565,6 +570,7 @@ class HueMover {
       if (k >= 1) {
         this.ladderMove = null;
         if (mv.kind !== "enterTop") {
+          this.ladderNeedsRelease = true;
           this.mode = "ground";
           this.grounded = true;
           this.lastGroundedAt = this.now;
@@ -586,10 +592,14 @@ class HueMover {
       return this.publish();
     }
 
-    // Toward the ladder climbs up, away climbs down.
-    const u = mag > 0.3 ? dirX * L.facing.x + dirZ * L.facing.z : 0;
+    // Toward the ladder climbs up, away climbs down (or, with LADDER_SCREEN_UP, W / stick-up).
+    const u = FLAGS.LADDER_SCREEN_UP ? screenUp : mag > 0.3 ? dirX * L.facing.x + dirZ * L.facing.z : 0;
     const sign = u > 0.3 ? 1 : u < -0.3 ? -1 : 0;
     this.feet.y += sign * CLIMB.ladderSpeed * dt;
+    this.feet.y = Math.max(this.feet.y, L.bottomY + 0.005);
+    // With LADDER_SCREEN_UP, S both walks you onto the ladder and climbs down: only step off at
+    // the bottom once you've actually climbed a bit.
+    if (this.feet.y > L.bottomY + 0.05) this.ladderLeftBottom = true;
     this.anim.setTimeScale((sign * CLIMB.ladderSpeed) / this.climbRiseSpeed);
 
     if (sign > 0 && this.feet.y >= L.topY + 0.01) {
@@ -603,7 +613,7 @@ class HueMover {
         time: CLIMB.ladderExitTime,
       };
       this.yaw = yawFor(L.exit.x, L.exit.z);
-    } else if (sign < 0 && this.feet.y <= L.bottomY + 0.005) {
+    } else if (sign < 0 && this.feet.y <= L.bottomY + 0.005 && (!FLAGS.LADDER_SCREEN_UP || this.ladderLeftBottom)) {
       this.feet.y = L.bottomY + 0.005;
       this.ladderMove = {
         kind: "exitBottom",

@@ -4,7 +4,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { useRapier, type RapierCollider } from "@react-three/rapier";
 import { useEffect, useLayoutEffect, useRef } from "react";
 import * as THREE from "three";
-import { CAMERA as C } from "./config";
+import { CAMERA as C, FLAGS } from "./config";
 import { runtime, useGame } from "./store";
 
 /** Critically damped spring (Unity-style SmoothDamp). Mutates `state.v`. */
@@ -212,6 +212,11 @@ export function CameraRig() {
     const dist = Math.hypot(dx, dy, dz);
     let fovTarget = dist > C.fovFarDistance ? C.fovFar : C.fov;
     if (t.d < C.frontEdge) fovTarget = C.fov + (C.fovFront - C.fov) * ((C.frontEdge - t.d) / C.frontEdge);
+    if (FLAGS.PORTRAIT_FOV_BOOST && camera.aspect < 1) {
+      const minH = THREE.MathUtils.degToRad(C.portraitMinHFov);
+      const needV = THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(minH / 2) / camera.aspect));
+      fovTarget = Math.max(fovTarget, Math.min(needV, C.portraitMaxVFov));
+    }
     st.fov = smoothDamp(st.fov, fovTarget, st.vfov, 0.5, dt);
     if (Math.abs(camera.fov - st.fov) > 0.01) {
       camera.fov = st.fov;

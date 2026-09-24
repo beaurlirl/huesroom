@@ -69,6 +69,13 @@ export const MOVE = {
 export const FLAGS = {
   /** Second jump at 70% take-off speed, once per air time. Off by design. */
   DOUBLE_JUMP: false,
+  /**
+   * Ladder controls. false (the prompt): push *toward* the ladder to climb up. The ladder faces
+   * the camera, so that's S / joystick-down. true: W / joystick-up always climbs up.
+   */
+  LADDER_SCREEN_UP: false,
+  /** Portrait screens: widen the vertical FOV so at least ~55° shows side to side (capped at 70°). */
+  PORTRAIT_FOV_BOOST: false,
 };
 
 /** Climbing, ladder and trampoline (prompt 1.5 / 2.6). */
@@ -174,6 +181,8 @@ export const CAMERA = {
   peekPitch: (12 * Math.PI) / 180,
   peekPerPixel: 0.004,
   peekReturn: 0.4,
+  portraitMinHFov: 55,
+  portraitMaxVFov: 70,
 };
 
 export const INTRO = {
