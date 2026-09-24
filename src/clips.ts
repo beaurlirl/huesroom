@@ -25,15 +25,44 @@ function frame(clip: THREE.AnimationClip, index: "first" | "last") {
 }
 
 /** Pins the Hips' horizontal position to its first frame (removes travel). */
-function stripHorizontal(clip: THREE.AnimationClip, alsoVertical = false) {
+function stripHorizontal(clip: THREE.AnimationClip) {
   const v = hipsTrack(clip).values;
   const [f0, s0] = [v[FWD], v[SIDE]];
-  const u0 = v[UP];
   for (let i = 0; i < v.length; i += 3) {
     v[i + FWD] = f0;
     v[i + SIDE] = s0;
-    if (alsoVertical) v[i + UP] = u0;
   }
+}
+
+/** Caps the Hips height at the first frame's (standing) height: keeps crouches, drops the upward throw. */
+function clampRise(clip: THREE.AnimationClip) {
+  const v = hipsTrack(clip).values;
+  // UP holds -height, so "higher" is more negative.
+  const standing = v[UP];
+  for (let i = 0; i < v.length; i += 3) v[i + UP] = Math.max(v[i + UP], standing);
+}
+
+/** Samples the Hips forward travel (metres from frame 0) before it is stripped. */
+function forwardCurve(clip: THREE.AnimationClip, metresPerUnit: number): RootCurve {
+  const track = hipsTrack(clip);
+  const times = Float32Array.from(track.times);
+  const fwd = new Float32Array(times.length);
+  for (let i = 0; i < times.length; i++) fwd[i] = (track.values[i * 3 + FWD] - track.values[FWD]) * metresPerUnit;
+  return { times, fwd };
+}
+
+export type RootCurve = { times: Float32Array; fwd: Float32Array };
+
+/** Forward travel at time t (metres), linearly interpolated. */
+export function sampleCurve(curve: RootCurve, t: number) {
+  const { times, fwd } = curve;
+  if (t <= times[0]) return fwd[0];
+  const last = times.length - 1;
+  if (t >= times[last]) return fwd[last];
+  let i = 1;
+  while (times[i] < t) i++;
+  const a = (t - times[i - 1]) / (times[i] - times[i - 1]);
+  return fwd[i - 1] + (fwd[i] - fwd[i - 1]) * a;
 }
 
 /** Moves every frame of the Hips horizontally by (df, ds) track units. */
@@ -53,6 +82,8 @@ export type PreparedClips = {
    * motion (feet stay planted), so the root never moves during the rise.
    */
   seatedRootOffset: THREE.Vector3;
+  /** Forward travel removed from `fall_roll`; the capsule follows it during the roll. */
+  rollCurve: RootCurve;
 };
 
 /**
@@ -86,14 +117,19 @@ export function prepareClips(
   const sitShift = [sts0[0] - sit0[0], sts0[1] - sit0[1]] as const;
   shiftHorizontal(clips.sit, ...sitShift);
 
+  const rollCurve = forwardCurve(clips.fall_roll, metresPerUnit);
+
   // Locomotion loops and the rest: horizontal travel is driven by the capsule.
   for (const name of ["idle", "walk", "run", "climb_ladder", "jump_down", "jump_down_2", "fall_roll"] as const) {
     stripHorizontal(clips[name]);
   }
-  stripHorizontal(clips.jump, true);
+  // Height comes from physics; keep the crouches (real knee bends on the ground).
+  stripHorizontal(clips.jump);
+  clampRise(clips.jump);
 
   return {
     clips,
     seatedRootOffset: new THREE.Vector3(-sitShift[0] * metresPerUnit, 0, -sitShift[1] * metresPerUnit),
+    rollCurve,
   };
 }

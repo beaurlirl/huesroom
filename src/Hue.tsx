@@ -2,11 +2,17 @@
 
 import { useGLTF } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
+import { CapsuleCollider, RigidBody, type RapierCollider, type RapierRigidBody } from "@react-three/rapier";
 import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
+import { Animator } from "./animator";
 import { prepareClips } from "./clips";
-import { ASSETS, CLIP_NAMES, HUE, type ClipName } from "./config";
+import { ASSETS, CLIP_NAMES, HUE, MOVE, type ClipName } from "./config";
+import { initInput, readInput } from "./input";
 import { runtime, useGame } from "./store";
+import { useHueController } from "./useHueController";
+
+const IDLE_INPUT = { moveX: 0, moveZ: 0, run: false, jump: false };
 
 const UP = new THREE.Vector3(0, 1, 0);
 
@@ -37,7 +43,7 @@ export function Hue() {
   const root = gltf.scene.children[0]; // "Hue | 0.4572m placement"
   const armature = root.children[0];
 
-  const { clips, seatedRootOffset } = useMemo(() => {
+  const { clips, seatedRootOffset, rollCurve } = useMemo(() => {
     const raw = {} as Record<ClipName, THREE.AnimationClip>;
     CLIP_NAMES.forEach((name, i) => (raw[name] = animGltfs[i].animations[0]));
     return prepareClips(raw, root.scale.x * armature.scale.x);
@@ -53,16 +59,16 @@ export function Hue() {
     }
     return out;
   }, [mixer, clips]);
-  const current = useRef<ClipName>("sit");
+  const anim = useMemo(() => new Animator(mixer, actions, "sit"), [mixer, actions]);
 
-  const crossfadeTo = (name: ClipName, duration = HUE.crossfade) => {
-    const from = actions[current.current];
-    const to = actions[name];
-    if (from === to) return;
-    to.reset().setEffectiveWeight(1).play();
-    from.crossFadeTo(to, duration, false);
-    current.current = name;
-  };
+  const seatedFeet = useMemo(
+    () => seatedRootOffset.clone().applyAxisAngle(UP, spawn.yaw).add(spawn.feet),
+    [seatedRootOffset, spawn],
+  );
+
+  const bodyRef = useRef<RapierRigidBody>(null);
+  const colliderRef = useRef<RapierCollider>(null);
+  const controller = useHueController(bodyRef, colliderRef, anim, rollCurve);
 
   // First visible frame: a clip is bound, playing and evaluated, and the root is placed.
   useLayoutEffect(() => {
@@ -76,41 +82,61 @@ export function Hue() {
       }
     });
 
-    const seated = seatedRootOffset.clone().applyAxisAngle(UP, spawn.yaw).add(spawn.feet);
-    root.position.copy(seated);
+    root.position.copy(seatedFeet);
     root.rotation.set(0, spawn.yaw, 0);
-    runtime.feet.copy(seated);
+    runtime.feet.copy(seatedFeet);
+    runtime.grounded = true;
 
-    mixer.stopAllAction();
-    actions.sit.reset().play();
-    current.current = "sit";
-    mixer.update(0);
+    anim.snap("sit");
     gltf.scene.visible = true;
+    initInput();
     runtime.hueReady = true;
     return () => {
       runtime.hueReady = false;
     };
-  }, [gltf.scene, root, mixer, actions, spawn, seatedRootOffset]);
+  }, [gltf.scene, root, anim, spawn, seatedFeet]);
 
   // Rise on begin; hand over control when sit_to_stand finishes.
   useEffect(() => {
     if (phase !== "rising") return;
-    crossfadeTo("sit_to_stand");
+    anim.play("sit_to_stand");
     const onFinished = (e: { action: THREE.AnimationAction }) => {
       if (e.action !== actions.sit_to_stand) return;
-      crossfadeTo("idle");
+      anim.play("idle");
+      controller.get()?.place(seatedFeet, spawn.yaw);
       useGame.getState().setPhase("playing");
     };
     mixer.addEventListener("finished", onFinished);
     return () => mixer.removeEventListener("finished", onFinished);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, mixer, actions]);
+  }, [phase, mixer, actions, anim, controller, seatedFeet, spawn]);
 
-  useFrame((_, dt) => {
-    mixer.update(Math.min(dt, 1 / 20));
+  useFrame((_, rawDt) => {
+    const dt = Math.min(rawDt, 1 / 30);
+    const phase = useGame.getState().phase;
+    const mover = controller.get();
+    if (mover && (phase === "playing" || phase === "won")) {
+      mover.update(dt, phase === "playing" ? readInput() : IDLE_INPUT);
+      root.position.copy(mover.feet);
+      root.position.y -= MOVE.offset; // the controller keeps a skin gap under the capsule
+      root.rotation.set(0, mover.yaw, 0);
+    }
+    anim.update(dt);
   });
 
-  return <primitive object={gltf.scene} />;
+  return (
+    <>
+      <primitive object={gltf.scene} />
+      <RigidBody
+        ref={bodyRef}
+        type="kinematicPosition"
+        colliders={false}
+        position={[seatedFeet.x, seatedFeet.y + HUE.capsuleHalfHeight + HUE.capsuleRadius, seatedFeet.z]}
+        enabledRotations={[false, false, false]}
+      >
+        <CapsuleCollider ref={colliderRef} args={[HUE.capsuleHalfHeight, HUE.capsuleRadius]} />
+      </RigidBody>
+    </>
+  );
 }
 
 useGLTF.preload(ASSETS.hue, ASSETS.draco);

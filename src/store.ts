@@ -33,6 +33,7 @@ export const runtime = {
   grounded: true,
   /** Camera yaw (radians, 0 = looking toward -Z). Movement is relative to this. */
   cameraYaw: 0,
+  cameraPos: new THREE.Vector3(),
   /** Z of the open-wall plane, read from COL_Boundary south. */
   openWallZ: 1.52,
   /** Set once the first clip is bound, playing and evaluated. */

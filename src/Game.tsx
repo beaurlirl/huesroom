@@ -44,11 +44,11 @@ export default function Game() {
         <color attach="background" args={["#ffffff"]} />
         <Suspense fallback={null}>
           <Lighting />
-          <Physics gravity={[0, -16, 0]} debug={debug}>
+          <Physics gravity={[0, -16, 0]} timeStep="vary" debug={debug}>
             <Room />
             <Hue />
+            <CameraRig />
           </Physics>
-          <CameraRig />
           <SceneReady />
         </Suspense>
         {debug && <Stats />}
