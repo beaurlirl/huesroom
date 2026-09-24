@@ -72,6 +72,7 @@ export default function Game() {
           runtime,
           colliders: roomColliders,
           books: bookBodies,
+          touch: useTouchInput,
         },
       });
   }, [setDebug]);
