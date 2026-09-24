@@ -4,11 +4,13 @@ import { useThree } from "@react-three/fiber";
 import { useLayoutEffect, useMemo } from "react";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
+import { useIsTouch } from "./Hud";
 
 /** Env map for the chrome, leather clearcoat, velvet and eyes, plus key/ceiling/fill lights. */
 export function Lighting() {
   const gl = useThree((s) => s.gl);
   const scene = useThree((s) => s.scene);
+  const touch = useIsTouch();
 
   useLayoutEffect(() => {
     const pmrem = new THREE.PMREMGenerator(gl);
@@ -38,7 +40,7 @@ export function Lighting() {
         position={[0.7, 3.4, 3.6]}
         target={target}
         castShadow
-        shadow-mapSize={[2048, 2048]}
+        shadow-mapSize={touch ? [1024, 1024] : [2048, 2048]}
         shadow-bias={-0.0004}
         shadow-normalBias={0.02}
         shadow-camera-left={-1.9}

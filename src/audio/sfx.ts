@@ -83,8 +83,11 @@ async function loadClip(name: string, base: string) {
 /** Names of clips decoded so far (for ?test checks). */
 export const loadedClips = () => [...buffers.keys()];
 
-/** Creates/resumes the audio context. Call from a user gesture (the begin press). */
-export function unlockAudio() {
+/**
+ * Creates/resumes the audio context. Call from a user gesture (the begin press). With
+ * `resume = false` it only creates it (e.g. a tap while paused shouldn't restart the music).
+ */
+export function unlockAudio(resume = true) {
   if (typeof window === "undefined") return;
   if (!ctx) {
     const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
@@ -97,7 +100,8 @@ export function unlockAudio() {
     applyMute();
     for (const [name, base] of Object.entries(AUDIO_FILES)) if (base) void loadClip(name, base);
   }
-  if (ctx.state === "suspended") void ctx.resume();
+  // iOS Safari can also report "interrupted" (calls, app switches), not just "suspended".
+  if (resume && ctx.state !== "running") void ctx.resume();
 }
 
 // ------------------------------------------------------------------ synth fallbacks

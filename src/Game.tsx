@@ -1,9 +1,9 @@
 "use client";
 
-import { Stats } from "@react-three/drei";
+import { PerformanceMonitor, Stats } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Physics, useRapier } from "@react-three/rapier";
-import { Suspense, useEffect, useRef } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { AssetGate } from "./AssetGate";
 import { AudioDirector } from "./audio/AudioDirector";
@@ -24,6 +24,7 @@ import { ShareButton, ShareSnapshot } from "./ShareCard";
 import { TouchControls } from "./TouchControls";
 import { runtime, useGame } from "./store";
 import { Overlay } from "./ui/Overlay";
+import { theme } from "./ui/theme";
 
 /** Starts the intro once everything has rendered for a couple of frames. */
 function SceneReady() {
@@ -57,13 +58,48 @@ function TimerTicker() {
   return null;
 }
 
+function hasWebGL() {
+  try {
+    const c = document.createElement("canvas");
+    return !!(c.getContext("webgl2") ?? c.getContext("webgl"));
+  } catch {
+    return false;
+  }
+}
+
+/** Full-screen message for when the game can't draw (no WebGL, or the GPU context was lost). */
+function GraphicsMessage({ text, action }: { text: string; action?: { label: string; onClick: () => void } }) {
+  return (
+    <div
+      className="fixed inset-0 flex flex-col items-center justify-center gap-4 p-6 text-center"
+      style={{ background: theme.paper, color: theme.ink, fontFamily: theme.font }}
+    >
+      <div className="text-sm tracking-wide">{theme.wordmark}</div>
+      <p className="max-w-xs text-sm" style={{ color: theme.muted }}>
+        {text}
+      </p>
+      {action && (
+        <button type="button" onClick={action.onClick} className="rounded-full px-5 py-2 text-sm" style={{ background: theme.ink, color: theme.paper }}>
+          {action.label}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function Game() {
+  const [webgl] = useState(hasWebGL);
+  const [contextLost, setContextLost] = useState(false);
   const debug = useGame((s) => s.debug);
   const setDebug = useGame((s) => s.setDebug);
   const paused = useGame((s) => s.paused);
   const phase = useGame((s) => s.phase);
   useHotkeys();
   const coarse = useIsTouch();
+  // Adaptive resolution: start at the cap (1.5 on phones, 2 on desktop) and step down if the
+  // frame rate can't keep up.
+  const maxDpr = coarse ? 1.5 : 2;
+  const [dpr, setDpr] = useState(maxDpr);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -83,11 +119,19 @@ export default function Game() {
       });
   }, [setDebug]);
 
+  if (!webgl) return <GraphicsMessage text="This game needs WebGL. Try a recent version of Safari, Chrome or Firefox." />;
+
   return (
     <div className="fixed inset-0 bg-white">
       <Canvas
         shadows={{ type: THREE.PCFSoftShadowMap }}
-        dpr={coarse ? [1, 1.5] : [1, 2]}
+        dpr={Math.min(dpr, maxDpr)}
+        onCreated={({ gl }) => {
+          gl.domElement.addEventListener("webglcontextlost", (e) => {
+            e.preventDefault();
+            setContextLost(true);
+          });
+        }}
         camera={{
           fov: CAMERA.fov,
           near: CAMERA.near,
@@ -101,6 +145,12 @@ export default function Game() {
         }}
       >
         <color attach="background" args={["#ffffff"]} />
+        <PerformanceMonitor
+          onDecline={() => setDpr((d) => Math.max(1, d - 0.25))}
+          onIncline={() => setDpr((d) => Math.min(maxDpr, d + 0.25))}
+          flipflops={3}
+          onFallback={() => setDpr(1)}
+        />
         <Suspense fallback={null}>
           <AssetGate>
             <Lighting />
@@ -130,6 +180,10 @@ export default function Game() {
       <TouchControls />
       <Hud share={<ShareButton />} />
       <Overlay />
+      {/* Drawn over the (still mounted) scene: unmounting physics mid-frame throws in Rapier. */}
+      {contextLost && (
+        <GraphicsMessage text="The graphics were reset by the device." action={{ label: "Reload", onClick: () => window.location.reload() }} />
+      )}
     </div>
   );
 }

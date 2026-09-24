@@ -157,13 +157,46 @@ export function ShareButton() {
     return () => clearTimeout(t);
   }, [toast]);
 
+  // Render the card as soon as the win panel shows: iOS only allows navigator.share within a
+  // short window after the tap, which the render (fonts, per-pixel tone mapping) can outlast.
+  const [card, setCard] = useState<{ time: number; blob: Blob } | null>(null);
+  useEffect(() => {
+    if (!result) return;
+    let cancelled = false;
+    // Let the win frame settle first so the snapshot shows Hue at rest.
+    const t = setTimeout(() => {
+      void renderShareCard(result.time).then((blob) => {
+        if (!cancelled && blob) setCard({ time: result.time, blob });
+      });
+    }, 350);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [result]);
+
   if (!result) return null;
+
+  const download = async (blob: Blob, text: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "hues-room.png";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    try {
+      await navigator.clipboard.writeText(text);
+      setToast("card saved · caption copied");
+    } catch {
+      setToast("card saved");
+    }
+  };
 
   const onShare = async () => {
     if (busy) return;
     setBusy(true);
     try {
-      const blob = await renderShareCard(result.time);
+      const blob = card?.time === result.time ? card.blob : await renderShareCard(result.time);
       if (!blob) return;
       const file = new File([blob], "hues-room.png", { type: "image/png" });
       const text = shareCaption(result.time);
@@ -173,23 +206,13 @@ export function ShareButton() {
       if (phone && navigator.canShare?.({ files: [file] })) {
         try {
           await navigator.share({ files: [file], text });
-        } catch {
-          // Dismissed share sheet: nothing to do.
+          return;
+        } catch (e) {
+          if (e instanceof DOMException && e.name === "AbortError") return; // sheet dismissed
+          // NotAllowedError (activation expired) or anything else: fall back to download.
         }
-        return;
       }
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = file.name;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
-      try {
-        await navigator.clipboard.writeText(text);
-        setToast("card saved · caption copied");
-      } catch {
-        setToast("card saved");
-      }
+      await download(blob, text);
     } finally {
       setBusy(false);
     }

@@ -119,6 +119,13 @@ class HueMover {
     this.grounded = true;
     this.landing = this.climb = this.ladderMove = null;
     this.jumpPressedAt = -Infinity;
+    // Air-time state too: a restart mid-jump used to leave `jumped` set, which blocks jumping.
+    this.jumped = false;
+    this.shortHopCut = false;
+    this.doubleUsed = false;
+    this.airTime = 0;
+    this.pushTimer = 0;
+    this.lastGroundedAt = this.now;
     const c = { x: feet.x, y: feet.y + CAPSULE_CENTER, z: feet.z };
     this.body.setTranslation(c, true);
     this.body.setNextKinematicTranslation(c);

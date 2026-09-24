@@ -104,6 +104,24 @@ await page.keyboard.press('KeyP'); await page.waitForTimeout(100);
 check('P pauses', (await state()).paused);
 await page.keyboard.press('KeyP'); await page.waitForTimeout(100);
 
+// 4b. Restart while airborne must not block jumping next run (review finding).
+await page.keyboard.press('Space');
+await page.waitForTimeout(80);
+await page.keyboard.press('KeyR');
+await page.waitForFunction(() => window.__hue.useGame.getState().phase === 'ready', null, { timeout: 10000 });
+await page.keyboard.press('Space');
+await page.waitForFunction(() => window.__hue.useGame.getState().phase === 'playing', null, { timeout: 5000 });
+await page.waitForTimeout(300);
+{
+  const y0 = (await state()).feet[1];
+  await page.keyboard.down('Space');
+  let top = y0;
+  for (let i = 0; i < 20; i++) { await page.waitForTimeout(20); top = Math.max(top, (await state()).feet[1]); }
+  await page.keyboard.up('Space');
+  await page.waitForTimeout(600);
+  check('can jump after restarting mid-air', top - y0 > 0.4, `rise ${(top - y0).toFixed(2)} m`);
+}
+
 // 5. R restarts mid-run: coins back, books back, Hue seated, timer 0, intro again.
 await page.evaluate(() => { const b = [...window.__hue.books][0]; b.setTranslation({ x: 0.9, y: 0.05, z: 0.3 }, true); });
 await page.keyboard.press('KeyR');

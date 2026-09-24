@@ -9,18 +9,18 @@ export function AudioDirector() {
   useEffect(() => {
     // Browsers only allow audio after a user gesture: the begin press is the first one.
     const unlock = () => {
-      unlockAudio();
+      unlockAudio(!useGame.getState().paused);
       startMusic();
     };
-    window.addEventListener("pointerdown", unlock);
-    window.addEventListener("keydown", unlock);
+    // touchend too: older iOS only unlocks audio inside touchend/click.
+    const events = ["pointerdown", "touchend", "keydown"] as const;
+    for (const e of events) window.addEventListener(e, unlock);
     const unsub = useGame.subscribe((s, prev) => {
       if (s.phase === "won" && prev.phase !== "won") playSfx("win");
       if (s.paused !== prev.paused) setMusicPaused(s.paused);
     });
     return () => {
-      window.removeEventListener("pointerdown", unlock);
-      window.removeEventListener("keydown", unlock);
+      for (const e of events) window.removeEventListener(e, unlock);
       unsub();
     };
   }, []);
