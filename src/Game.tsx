@@ -1,11 +1,12 @@
 "use client";
 
 import { Stats } from "@react-three/drei";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Physics, useRapier } from "@react-three/rapier";
 import { Suspense, useEffect, useRef } from "react";
 import * as THREE from "three";
 import { AssetGate } from "./AssetGate";
+import { AudioDirector } from "./audio/AudioDirector";
 import { bookBodies, Books } from "./Books";
 import { CameraRig } from "./CameraRig";
 import { Coins } from "./Coins";
@@ -18,6 +19,7 @@ import { CAMERA } from "./config";
 import { Hue } from "./Hue";
 import { Lighting } from "./Lighting";
 import { Room, roomColliders } from "./Room";
+import { ShareButton, ShareSnapshot } from "./ShareCard";
 import { TouchControls } from "./TouchControls";
 import { runtime, useGame } from "./store";
 import { Overlay } from "./ui/Overlay";
@@ -36,10 +38,11 @@ function SceneReady() {
 /** ?debug / ?test: expose the physics world for scripted checks. */
 function ExposeWorld() {
   const { world } = useRapier();
+  const gl = useThree((s) => s.gl);
   useEffect(() => {
     const w = window as unknown as { __hue?: Record<string, unknown> };
-    if (w.__hue) w.__hue.world = world;
-  }, [world]);
+    if (w.__hue) Object.assign(w.__hue, { world, gl });
+  }, [world, gl]);
   return null;
 }
 
@@ -114,13 +117,15 @@ export default function Game() {
             </Physics>
             <SceneReady />
             <TimerTicker />
+          <ShareSnapshot />
             <Effects />
           </AssetGate>
         </Suspense>
         {debug && <Stats />}
       </Canvas>
+      <AudioDirector />
       <TouchControls />
-      <Hud />
+      <Hud share={<ShareButton />} />
       <Overlay />
     </div>
   );

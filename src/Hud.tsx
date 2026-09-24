@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useSyncExternalStore } from "react";
+import { useAudioSettings } from "./audio/sfx";
 import { COIN_COUNT, formatTime, runtime, useGame } from "./store";
 import { theme } from "./ui/theme";
 
@@ -117,6 +118,46 @@ function PausePanel() {
   );
 }
 
+function IconButton({ label, onClick, children }: { label: string; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+      className="pointer-events-auto flex h-8 w-8 items-center justify-center rounded-full active:scale-95"
+      style={{ background: theme.pill }}
+    >
+      {children}
+    </button>
+  );
+}
+
+/** Sound and music toggles (saved). */
+function MuteButtons() {
+  const { sfxMuted, musicMuted, toggleSfx, toggleMusic } = useAudioSettings();
+  const off = <line x1="2" y1="2" x2="12" y2="12" stroke={theme.ink} strokeWidth="1.4" strokeLinecap="round" />;
+  return (
+    <>
+      <IconButton label={sfxMuted ? "Unmute sound" : "Mute sound"} onClick={toggleSfx}>
+        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden>
+          <path d="M2 5h2.5L8 2v10L4.5 9H2z" fill={theme.ink} />
+          {!sfxMuted && <path d="M10 4.5a3.5 3.5 0 0 1 0 5" stroke={theme.ink} strokeWidth="1.3" fill="none" strokeLinecap="round" />}
+          {sfxMuted && off}
+        </svg>
+      </IconButton>
+      <IconButton label={musicMuted ? "Unmute music" : "Mute music"} onClick={toggleMusic}>
+        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden>
+          <path d="M5 10.5V3l6-1.2v7" stroke={theme.ink} strokeWidth="1.3" fill="none" />
+          <circle cx="3.8" cy="10.6" r="1.6" fill={theme.ink} />
+          <circle cx="9.8" cy="9.2" r="1.6" fill={theme.ink} />
+          {musicMuted && off}
+        </svg>
+      </IconButton>
+    </>
+  );
+}
+
 /** Minimal HUD (prompt 1.9): coins top-left, timer top-right, pause, win panel. */
 export function Hud({ share }: { share?: React.ReactNode }) {
   const phase = useGame((s) => s.phase);
@@ -141,6 +182,7 @@ export function Hud({ share }: { share?: React.ReactNode }) {
         className="absolute flex items-center gap-2"
         style={{ top: "max(16px, env(safe-area-inset-top))", right: "max(16px, env(safe-area-inset-right))" }}
       >
+        <MuteButtons />
         <div className={pill} style={{ background: theme.pill }}>
           <Timer />
         </div>
