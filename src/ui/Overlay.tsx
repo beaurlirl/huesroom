@@ -1,23 +1,11 @@
 "use client";
 
 import { useProgress } from "@react-three/drei";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useState } from "react";
+import { useIsTouch } from "../Hud";
 import { INTRO } from "../config";
 import { RESET_FADE_MS, useGame } from "../store";
 import { theme } from "./theme";
-
-const COARSE = "(pointer: coarse)";
-function useIsTouch() {
-  return useSyncExternalStore(
-    (cb) => {
-      const mq = window.matchMedia(COARSE);
-      mq.addEventListener("change", cb);
-      return () => mq.removeEventListener("change", cb);
-    },
-    () => window.matchMedia(COARSE).matches,
-    () => false,
-  );
-}
 
 /** Loading screen → fade from white with the title → `begin` prompt. */
 export function Overlay() {

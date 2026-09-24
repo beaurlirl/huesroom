@@ -7,6 +7,7 @@ import { Suspense, useEffect, useRef } from "react";
 import * as THREE from "three";
 import { AssetGate } from "./AssetGate";
 import { AudioDirector } from "./audio/AudioDirector";
+import { loadedClips } from "./audio/sfx";
 import { bookBodies, Books } from "./Books";
 import { CameraRig } from "./CameraRig";
 import { Coins } from "./Coins";
@@ -39,10 +40,11 @@ function SceneReady() {
 function ExposeWorld() {
   const { world } = useRapier();
   const gl = useThree((s) => s.gl);
+  const scene = useThree((s) => s.scene);
   useEffect(() => {
     const w = window as unknown as { __hue?: Record<string, unknown> };
-    if (w.__hue) Object.assign(w.__hue, { world, gl });
-  }, [world, gl]);
+    if (w.__hue) Object.assign(w.__hue, { world, gl, scene });
+  }, [world, gl, scene]);
   return null;
 }
 
@@ -76,6 +78,7 @@ export default function Game() {
           colliders: roomColliders,
           books: bookBodies,
           touch: useTouchInput,
+          audio: { loadedClips },
         },
       });
   }, [setDebug]);

@@ -1,6 +1,6 @@
 import type { KinematicCharacterController, World } from "@dimforge/rapier3d-compat";
 import { useRapier, type RapierCollider as Collider, type RapierRigidBody as RigidBody } from "@react-three/rapier";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import type { Animator } from "./animator";
 import { playSfx } from "./audio/sfx";
@@ -175,9 +175,11 @@ class HueMover {
     // Face within reach, just below the top.
     const face = this.cast(f.x, top - 0.02, f.z, dirX, 0, dirZ, reach + 0.02, climbable);
     if (!face) return null;
-    // Head-room on top, and a clear path straight up for the capsule.
-    if (this.cast(px, top + 0.005, pz, 0, 1, 0, CLIMB.headroom, this.solid(true))) return null;
-    if (this.cast(f.x, f.y + HEIGHT + 0.005, f.z, 0, 1, 0, rise + 0.02, this.solid(true))) return null;
+    // Head-room on top, and a clear path straight up for the capsule. Only fixed geometry
+    // counts: loose books on a table top get shoved aside, they aren't a ceiling.
+    const fixedSolid = (c: Collider) => this.solid(true)(c) && !!c.parent()?.isFixed();
+    if (this.cast(px, top + 0.005, pz, 0, 1, 0, CLIMB.headroom, fixedSolid)) return null;
+    if (this.cast(f.x, f.y + HEIGHT + 0.005, f.z, 0, 1, 0, rise + 0.02, fixedSolid)) return null;
     this.debugProbe.hit = true;
     return { top, faceDist: face.timeOfImpact };
   }
@@ -638,13 +640,18 @@ export function useHueController(
     };
   }, [world]);
 
-  return {
-    /** Lazily binds once the controller and the body/collider refs exist. */
-    get() {
-      if (!mover.current && cc.current && body.current && collider.current) {
-        mover.current = new HueMover(world, rapier, cc.current, body.current, collider.current, anim, rollCurve, climbRiseSpeed);
-      }
-      return mover.current;
-    },
-  };
+  // Stable identity: callers list this in effect dependencies (a fresh object per render
+  // re-ran the restart effect on every re-render and snapped Hue back onto the chair).
+  return useMemo(
+    () => ({
+      /** Lazily binds once the controller and the body/collider refs exist. */
+      get() {
+        if (!mover.current && cc.current && body.current && collider.current) {
+          mover.current = new HueMover(world, rapier, cc.current, body.current, collider.current, anim, rollCurve, climbRiseSpeed);
+        }
+        return mover.current;
+      },
+    }),
+    [world, rapier, body, collider, anim, rollCurve, climbRiseSpeed],
+  );
 }

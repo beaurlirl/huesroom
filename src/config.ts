@@ -1,10 +1,17 @@
 // Tunables from CURSOR_GAME_DEV_BUILD_PROMPT.md. Units: metres, seconds.
 
+/**
+ * The game may be served under a sub-path of hue.onl (e.g. /room). Set NEXT_PUBLIC_BASE_PATH
+ * at build time (next.config.ts uses it as `basePath`) and every asset URL follows.
+ */
+export const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+export const asset = (path: string) => `${BASE_PATH}${path}`;
+
 export const ASSETS = {
-  room: "/room/room.glb",
-  hue: "/hue/hue.glb",
-  draco: "/draco/",
-  anim: (name: ClipName) => `/hue/anim/${name}.glb`,
+  room: asset("/room/room.glb"),
+  hue: asset("/hue/hue.glb"),
+  draco: asset("/draco/"),
+  anim: (name: ClipName) => asset(`/hue/anim/${name}.glb`),
 };
 
 export const FX_TEXTURES = [
@@ -13,7 +20,7 @@ export const FX_TEXTURES = [
   "/fx/smoke_puff_1.png",
   "/fx/smoke_puff_2.png",
   "/fx/smoke_puff_3.png",
-];
+].map(asset);
 
 export const CLIP_NAMES = [
   "idle",

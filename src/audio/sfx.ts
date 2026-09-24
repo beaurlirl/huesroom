@@ -1,15 +1,24 @@
 // Sound effects and music (prompt 1.9).
 //
-// Each sound plays an approved clip from public/audio/ when one is listed in AUDIO_FILES, and
-// otherwise falls back to a small Web Audio synth. Clips are chosen from MP3s on the dev's
-// Mac and approved before they're wired in (see public/audio/CREDITS.md).
+// Each sound plays a clip from public/audio/ when one is listed in AUDIO_FILES, and otherwise
+// falls back to a small Web Audio synth (also used until a clip finishes loading).
 
 import { create } from "zustand";
+import { asset } from "../config";
 
 export type SfxName = "chime" | "boing" | "thud" | "win" | "step";
 
-/** Approved clips: name → base path (".ogg" and ".mp3" siblings). Empty = synth fallback. */
-const AUDIO_FILES: Partial<Record<SfxName | "music", string>> = {};
+/**
+ * Clips: name → base path (".ogg" (Opus) and ".mp3" siblings). Anything not listed uses the
+ * synth fallback: the music loop (no music MP3 exists on the Mac) and footsteps.
+ * Sources and processing: public/audio/CREDITS.md.
+ */
+const AUDIO_FILES: Partial<Record<SfxName | "music", string>> = {
+  chime: asset("/audio/chime"),
+  boing: asset("/audio/boing"),
+  thud: asset("/audio/thud"),
+  win: asset("/audio/win"),
+};
 
 const MUTE_KEY = "huesroom.mute";
 
@@ -61,7 +70,7 @@ function applyMute() {
 async function loadClip(name: string, base: string) {
   if (!ctx) return;
   const probe = document.createElement("audio");
-  const ext = probe.canPlayType('audio/ogg; codecs="vorbis"') ? "ogg" : "mp3";
+  const ext = probe.canPlayType('audio/ogg; codecs="opus"') ? "ogg" : "mp3";
   try {
     const res = await fetch(`${base}.${ext}`);
     if (!res.ok) return;
@@ -70,6 +79,9 @@ async function loadClip(name: string, base: string) {
     // Missing or undecodable: the synth fallback stays in place.
   }
 }
+
+/** Names of clips decoded so far (for ?test checks). */
+export const loadedClips = () => [...buffers.keys()];
 
 /** Creates/resumes the audio context. Call from a user gesture (the begin press). */
 export function unlockAudio() {

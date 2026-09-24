@@ -124,6 +124,7 @@ export function Hue() {
 
   // ?debug: jump Hue anywhere (feet position, facing in degrees; 0 = +X, 90 = toward -Z).
   useEffect(() => {
+    (runtime.debug as Record<string, unknown>).anim = anim;
     runtime.debug.teleport = (x, y, z, yawDeg = 90) => {
       const mover = controller.get();
       if (!mover) return;
