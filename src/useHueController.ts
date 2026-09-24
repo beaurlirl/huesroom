@@ -5,7 +5,8 @@ import * as THREE from "three";
 import type { Animator } from "./animator";
 import { playSfx } from "./audio/sfx";
 import { sampleCurve, type RootCurve } from "./clips";
-import { CLIMB, CLIP_TIMES, FLAGS, HUE, LANDING, MOVE } from "./config";
+import { bookBodies } from "./Books";
+import { BOOKS, CLIMB, CLIP_TIMES, FLAGS, HUE, LANDING, MOVE } from "./config";
 import type { InputSample } from "./input";
 import { beanbag, colliderMeta, roomColliders, type BoxCollider } from "./Room";
 import { runtime } from "./store";
@@ -89,6 +90,9 @@ class HueMover {
   private pushTimer = 0;
   private ladderMove: LadderMove | null = null;
   private speedSmoothed = 0;
+  private lastKick = new Map<number, number>();
+  /** Whether autostep currently ignores dynamic bodies (true while running). */
+  private autostepDynamic = false;
   private ladder: Ladder | null;
   private ray: InstanceType<Rapier["Ray"]>;
 
@@ -268,7 +272,15 @@ class HueMover {
       desired.z += -Math.sin(this.yaw) * df;
     }
 
+    // Walking steps up onto books (you can stand on them); running treats them as obstacles
+    // so he kicks them instead of riding over them.
+    const running = Math.hypot(this.vel.x, this.vel.z) > (MOVE.walkSpeed + MOVE.runSpeed) / 2;
+    if (running !== this.autostepDynamic) {
+      this.autostepDynamic = running;
+      this.cc.enableAutostep(MOVE.autostepMax, MOVE.autostepMinWidth, !running);
+    }
     const m = this.move(desired, false);
+    this.pushBooks();
     const wasGrounded = this.grounded;
     this.grounded = this.cc.computedGrounded() && this.vel.y <= 0;
     if (this.grounded) {
@@ -292,6 +304,29 @@ class HueMover {
     this.feet.y += m.y;
     this.feet.z += m.z;
     return m;
+  }
+
+  /**
+   * The controller is kinematic, so books don't get pushed by it: on each contact, shove the
+   * book along Hue's horizontal velocity (gentle walking, a kick with a little lift running).
+   */
+  private pushBooks() {
+    const speed = Math.hypot(this.vel.x, this.vel.z);
+    if (speed < 0.05) return;
+    const running = speed > (MOVE.walkSpeed + MOVE.runSpeed) / 2;
+    const impulse = running ? BOOKS.runImpulse : BOOKS.walkImpulse;
+    for (let i = 0; i < this.cc.numComputedCollisions(); i++) {
+      const body = this.cc.computedCollision(i)?.collider?.parent();
+      if (!body || !bookBodies.has(body)) continue;
+      const last = this.lastKick.get(body.handle) ?? -Infinity;
+      if (this.now - last < BOOKS.cooldown) continue;
+      this.lastKick.set(body.handle, this.now);
+      const k = impulse / speed;
+      body.applyImpulse({ x: this.vel.x * k, y: running ? impulse * BOOKS.runLift : 0, z: this.vel.z * k }, true);
+      const v = body.linvel();
+      const s = Math.hypot(v.x, v.y, v.z);
+      if (s > BOOKS.maxSpeed) body.setLinvel({ x: (v.x / s) * BOOKS.maxSpeed, y: (v.y / s) * BOOKS.maxSpeed, z: (v.z / s) * BOOKS.maxSpeed }, true);
+    }
   }
 
   private publish() {

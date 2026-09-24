@@ -5,7 +5,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { playSfx } from "./audio/sfx";
-import { ASSETS, COINS, HUE } from "./config";
+import { ASSETS, COINS, FX_TEXTURES, HUE } from "./config";
 import { createCoinEnvironment } from "./fx/coinEnvironment";
 import { SpriteBatch } from "./fx/SpriteBatch";
 import { blenderName } from "./Room";
@@ -70,13 +70,7 @@ export function Coins() {
   const gl = useThree((s) => s.gl);
   const coinEnv = useMemo(() => createCoinEnvironment(gl), [gl]);
   useEffect(() => () => coinEnv.dispose(), [coinEnv]);
-  const [sparkle, ...smokeTex] = useTexture([
-    "/fx/sparkle.png",
-    "/fx/smoke_puff_0.png",
-    "/fx/smoke_puff_1.png",
-    "/fx/smoke_puff_2.png",
-    "/fx/smoke_puff_3.png",
-  ]);
+  const [sparkle, ...smokeTex] = useTexture(FX_TEXTURES);
   const runId = useGame((s) => s.runId);
 
   const smokePerCoin = useMemo(() => (isTouch() ? COINS.smokePerCoinMobile : COINS.smokePerCoin), []);

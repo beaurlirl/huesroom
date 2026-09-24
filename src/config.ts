@@ -7,6 +7,14 @@ export const ASSETS = {
   anim: (name: ClipName) => `/hue/anim/${name}.glb`,
 };
 
+export const FX_TEXTURES = [
+  "/fx/sparkle.png",
+  "/fx/smoke_puff_0.png",
+  "/fx/smoke_puff_1.png",
+  "/fx/smoke_puff_2.png",
+  "/fx/smoke_puff_3.png",
+];
+
 export const CLIP_NAMES = [
   "idle",
   "walk",
@@ -115,6 +123,17 @@ export const COINS = {
   smokeOpacity: [0.15, 0.35] as const,
   smokeSize: [0.1, 0.18] as const,
   smokeBehind: 0.04,
+};
+
+/** Kickable books (prompt 1.7). */
+export const BOOKS = {
+  walkImpulse: 0.02, // N·s
+  runImpulse: 0.06,
+  runLift: 0.15,
+  maxSpeed: 2.5,
+  /** Min seconds between impulses on the same book (0 = every contact frame, as the prompt says). */
+  cooldown: 0,
+  thudSpeed: 1,
 };
 
 export const BLOOM = { threshold: 2.2, intensity: 0.8 };
