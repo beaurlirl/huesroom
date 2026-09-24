@@ -3,6 +3,7 @@ import { useRapier, type RapierCollider as Collider, type RapierRigidBody as Rig
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import type { Animator } from "./animator";
+import { playSfx } from "./audio/sfx";
 import { sampleCurve, type RootCurve } from "./clips";
 import { CLIMB, CLIP_TIMES, FLAGS, HUE, LANDING, MOVE } from "./config";
 import type { InputSample } from "./input";
@@ -345,6 +346,7 @@ class HueMover {
         this.takeOff(Math.sqrt(2 * MOVE.gravity * apex));
         this.shortHopCut = true; // holding Space adds nothing, releasing takes nothing
         beanbag.bounceAt = beanbag.clock();
+        playSfx("boing");
         return;
       }
 

@@ -3,7 +3,7 @@
 import { useProgress } from "@react-three/drei";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { INTRO } from "../config";
-import { useGame } from "../store";
+import { RESET_FADE_MS, useGame } from "../store";
 import { theme } from "./theme";
 
 const COARSE = "(pointer: coarse)";
@@ -61,6 +61,7 @@ export function Overlay() {
   }, [phase, setPhase]);
 
   const loading = phase === "loading";
+  const white = loading || phase === "resetting";
 
   return (
     <div className="pointer-events-none fixed inset-0 select-none" style={{ fontFamily: theme.font, color: theme.ink }}>
@@ -69,8 +70,8 @@ export function Overlay() {
         className="absolute inset-0 flex flex-col items-center justify-center"
         style={{
           background: theme.paper,
-          opacity: loading ? 1 : 0,
-          transition: `opacity ${INTRO.fadeFromWhite}s ease-in-out`,
+          opacity: white ? 1 : 0,
+          transition: `opacity ${phase === "resetting" ? RESET_FADE_MS / 1000 : INTRO.fadeFromWhite}s ease-in-out`,
         }}
       >
         <div

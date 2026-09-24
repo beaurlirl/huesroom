@@ -5,7 +5,7 @@ import { useRapier, type RapierCollider } from "@react-three/rapier";
 import { useEffect, useLayoutEffect, useRef } from "react";
 import * as THREE from "three";
 import { CAMERA as C } from "./config";
-import { runtime } from "./store";
+import { runtime, useGame } from "./store";
 
 /** Critically damped spring (Unity-style SmoothDamp). Mutates `state.v`. */
 function smoothDamp(current: number, target: number, state: { v: number }, smoothTime: number, dt: number) {
@@ -113,6 +113,12 @@ export function CameraRig() {
 
   const euler = useRef(new THREE.Euler(0, 0, 0, "YXZ"));
 
+  // Restart: snap back to the start shot (the white fade hides the jump).
+  const runId = useGame((st) => st.runId);
+  useEffect(() => {
+    s.current.initialised = false;
+  }, [runId]);
+
   const ray = useRef(new rapier.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: -1 }));
   const inside = useRef(new Set<number>());
   /** Only fixed room geometry blocks the view (not Hue, the books or sensors). */
@@ -154,6 +160,8 @@ export function CameraRig() {
       st.x = t.x;
       st.y = t.y;
       st.look.copy(t.look);
+      for (const v of [st.vx, st.vy, st.vlx, st.vly, st.vlz, st.vux, st.vuy]) v.v = 0;
+      st.unblock.set(0, 0);
       st.initialised = true;
     }
     if (!st.initialised) return;

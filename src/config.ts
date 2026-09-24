@@ -95,6 +95,30 @@ export const CLIP_TIMES = {
   fallRollStart: 0.08,
 };
 
+/** Coins (prompt 1.8 / 2.7). */
+export const COINS = {
+  sensorRadius: 0.08,
+  spinPeriod: 2.5,
+  bob: 0.015,
+  bobPeriod: 1.8,
+  popTime: 0.2,
+  envMapIntensity: 2.5,
+  glintsPerCoin: 3,
+  glintDur: [0.25, 0.4] as const,
+  glintWait: [0.3, 1.2] as const,
+  glintSize: [0.03, 0.06] as const,
+  /** Sparkles render above 1.0 so the bloom pass picks them up. */
+  glintBoost: 6,
+  smokePerCoin: 6,
+  smokePerCoinMobile: 3,
+  burstPuffs: 6,
+  smokeOpacity: [0.15, 0.35] as const,
+  smokeSize: [0.1, 0.18] as const,
+  smokeBehind: 0.04,
+};
+
+export const BLOOM = { threshold: 2.2, intensity: 0.8 };
+
 export const CAMERA = {
   planeOffset: 0.02, // in front of COL_Boundary south's inner face
   xClamp: 1.15,

@@ -9,7 +9,7 @@ import { Animator } from "./animator";
 import { prepareClips } from "./clips";
 import { ASSETS, CLIP_NAMES, HUE, MOVE, type ClipName } from "./config";
 import { initInput, readInput } from "./input";
-import { runtime, useGame } from "./store";
+import { isRunning, runtime, useGame } from "./store";
 import { useHueController } from "./useHueController";
 
 const IDLE_INPUT = { moveX: 0, moveZ: 0, run: false, jump: false };
@@ -110,6 +110,18 @@ export function Hue() {
     return () => mixer.removeEventListener("finished", onFinished);
   }, [phase, mixer, actions, anim, controller, seatedFeet, spawn]);
 
+  // Restart: back on the chair, seated, capsule out of the way of the books.
+  const runId = useGame((s) => s.runId);
+  useEffect(() => {
+    if (runId === 0) return;
+    controller.get()?.place(seatedFeet, spawn.yaw);
+    root.position.copy(seatedFeet);
+    root.rotation.set(0, spawn.yaw, 0);
+    runtime.feet.copy(seatedFeet);
+    runtime.grounded = true;
+    anim.snap("sit");
+  }, [runId, controller, seatedFeet, spawn, root, anim]);
+
   // ?debug: jump Hue anywhere (feet position, facing in degrees; 0 = +X, 90 = toward -Z).
   useEffect(() => {
     runtime.debug.teleport = (x, y, z, yawDeg = 90) => {
@@ -124,6 +136,7 @@ export function Hue() {
   }, [controller, anim]);
 
   useFrame((_, rawDt) => {
+    if (!isRunning()) return;
     const dt = Math.min(rawDt, 1 / 30);
     const phase = useGame.getState().phase;
     const mover = controller.get();

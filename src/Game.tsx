@@ -6,7 +6,11 @@ import { Physics } from "@react-three/rapier";
 import { Suspense, useEffect, useRef } from "react";
 import * as THREE from "three";
 import { CameraRig } from "./CameraRig";
+import { Coins } from "./Coins";
+import { Hud } from "./Hud";
+import { useHotkeys } from "./input/hotkeys";
 import { DebugView } from "./DebugView";
+import { Effects } from "./Effects";
 import { CAMERA } from "./config";
 import { Hue } from "./Hue";
 import { Lighting } from "./Lighting";
@@ -24,14 +28,28 @@ function SceneReady() {
   return null;
 }
 
+/** The run timer: starts when the player gets control, stops on the win, pauses with the game. */
+function TimerTicker() {
+  useFrame((_, dt) => {
+    const { phase, paused } = useGame.getState();
+    if (phase === "playing" && !paused) runtime.elapsed += Math.min(dt, 0.25);
+  });
+  return null;
+}
+
 export default function Game() {
   const debug = useGame((s) => s.debug);
   const setDebug = useGame((s) => s.setDebug);
+  const paused = useGame((s) => s.paused);
+  const phase = useGame((s) => s.phase);
+  useHotkeys();
 
   useEffect(() => {
-    const debug = new URLSearchParams(window.location.search).has("debug");
+    const params = new URLSearchParams(window.location.search);
+    const debug = params.has("debug");
     setDebug(debug);
-    if (debug) Object.assign(window, { __hue: { useGame, runtime, colliders: roomColliders } });
+    // ?test exposes the same hooks without the debug visuals (for scripted screenshots).
+    if (debug || params.has("test")) Object.assign(window, { __hue: { useGame, runtime, colliders: roomColliders } });
   }, [setDebug]);
 
   return (
@@ -45,16 +63,20 @@ export default function Game() {
         <color attach="background" args={["#ffffff"]} />
         <Suspense fallback={null}>
           <Lighting />
-          <Physics gravity={[0, -16, 0]} timeStep="vary" debug={debug}>
+          <Physics gravity={[0, -16, 0]} timeStep="vary" debug={debug} paused={paused || phase === "resetting"}>
             <Room />
             <Hue />
+            <Coins />
             <CameraRig />
             {debug && <DebugView />}
           </Physics>
           <SceneReady />
+          <TimerTicker />
+          <Effects />
         </Suspense>
         {debug && <Stats />}
       </Canvas>
+      <Hud />
       <Overlay />
     </div>
   );
