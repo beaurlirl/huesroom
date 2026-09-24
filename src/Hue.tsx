@@ -43,7 +43,7 @@ export function Hue() {
   const root = gltf.scene.children[0]; // "Hue | 0.4572m placement"
   const armature = root.children[0];
 
-  const { clips, seatedRootOffset, rollCurve } = useMemo(() => {
+  const { clips, seatedRootOffset, rollCurve, climbRiseSpeed } = useMemo(() => {
     const raw = {} as Record<ClipName, THREE.AnimationClip>;
     CLIP_NAMES.forEach((name, i) => (raw[name] = animGltfs[i].animations[0]));
     return prepareClips(raw, root.scale.x * armature.scale.x);
@@ -68,7 +68,7 @@ export function Hue() {
 
   const bodyRef = useRef<RapierRigidBody>(null);
   const colliderRef = useRef<RapierCollider>(null);
-  const controller = useHueController(bodyRef, colliderRef, anim, rollCurve);
+  const controller = useHueController(bodyRef, colliderRef, anim, rollCurve, climbRiseSpeed);
 
   // First visible frame: a clip is bound, playing and evaluated, and the root is placed.
   useLayoutEffect(() => {
@@ -110,12 +110,29 @@ export function Hue() {
     return () => mixer.removeEventListener("finished", onFinished);
   }, [phase, mixer, actions, anim, controller, seatedFeet, spawn]);
 
+  // ?debug: jump Hue anywhere (feet position, facing in degrees; 0 = +X, 90 = toward -Z).
+  useEffect(() => {
+    runtime.debug.teleport = (x, y, z, yawDeg = 90) => {
+      const mover = controller.get();
+      if (!mover) return;
+      mover.place(new THREE.Vector3(x, y, z), (yawDeg * Math.PI) / 180);
+      anim.play("idle", { fade: 0 });
+    };
+    return () => {
+      runtime.debug.teleport = null;
+    };
+  }, [controller, anim]);
+
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, 1 / 30);
     const phase = useGame.getState().phase;
     const mover = controller.get();
     if (mover && (phase === "playing" || phase === "won")) {
-      mover.update(dt, phase === "playing" ? readInput() : IDLE_INPUT);
+      const scripted = runtime.debug.input;
+      const input = scripted ? { moveX: scripted.x, moveZ: -scripted.z, run: scripted.run, jump: scripted.jump } : readInput();
+      mover.update(dt, phase === "playing" ? input : IDLE_INPUT);
+      runtime.debug.mode = mover.mode;
+      runtime.debug.probe = mover.debugProbe;
       root.position.copy(mover.feet);
       root.position.y -= MOVE.offset; // the controller keeps a skin gap under the capsule
       root.rotation.set(0, mover.yaw, 0);

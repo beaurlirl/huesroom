@@ -51,6 +51,29 @@ export const MOVE = {
   airPoseDelay: 0.08,
 };
 
+export const FLAGS = {
+  /** Second jump at 70% take-off speed, once per air time. Off by design. */
+  DOUBLE_JUMP: false,
+};
+
+/** Climbing, ladder and trampoline (prompt 1.5 / 2.6). */
+export const CLIMB = {
+  minRise: 0.1,
+  maxRise: 0.55,
+  headroom: 0.47,
+  probeAhead: 0.1,
+  pushTime: 0.15,
+  riseSpeed: 0.28,
+  overDistance: 0.1,
+  overPastLip: 0.05,
+  overTime: 0.15,
+  ladderSpeed: 0.22,
+  ladderExitMargin: 0.08,
+  ladderExitTime: 0.4,
+  ladderBottomStep: 0.1,
+  doubleJumpScale: 0.7,
+};
+
 /** Landings (prompt 1.5 / 2.6). */
 export const LANDING = {
   hopMin: 0.2,

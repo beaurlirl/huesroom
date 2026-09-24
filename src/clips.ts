@@ -65,6 +65,55 @@ export function sampleCurve(curve: RootCurve, t: number) {
   return fwd[i - 1] + (fwd[i] - fwd[i - 1]) * a;
 }
 
+/**
+ * `climb_ladder` was authored facing -X (backwards), 0.26 m to the side, with the climb's
+ * 0.22 m-per-loop rise baked into the Hips. Turn it 180° about up, centre it on the root,
+ * put the lowest foot at the root, and remove the rise (the capsule supplies it) so the loop
+ * is seamless. Returns the rise speed (m/s at timeScale 1) so callers can match it.
+ */
+function normalizeClimb(clip: THREE.AnimationClip, metresPerUnit: number, footBelowHips: number, hipsForward: number) {
+  const pos = hipsTrack(clip);
+  const rot = clip.tracks.find((t) => t.name === "mixamorigHips.quaternion");
+  if (!rot) throw new Error("climb_ladder: no Hips rotation track");
+
+  // 180° about armature-local Z (which is world up, see axis note above).
+  const flip = new THREE.Quaternion(0, 0, 1, 0);
+  const q = new THREE.Quaternion();
+  const r = rot.values;
+  for (let i = 0; i < r.length; i += 4) {
+    q.set(r[i], r[i + 1], r[i + 2], r[i + 3]).premultiply(flip);
+    r[i] = q.x;
+    r[i + 1] = q.y;
+    r[i + 2] = q.z;
+    r[i + 3] = q.w;
+  }
+
+  const v = pos.values;
+  const times = pos.times;
+  const T = times[times.length - 1];
+  const n = v.length;
+  for (let i = 0; i < n; i += 3) {
+    v[i + FWD] = -v[i + FWD];
+    v[i + SIDE] = -v[i + SIDE];
+  }
+  const drift = [v[n - 3] - v[0], v[n - 2] - v[1], v[n - 1] - v[2]];
+  const riseSpeed = (-drift[2] * metresPerUnit) / T;
+  for (let k = 0, i = 0; i < n; i += 3, k++) {
+    const a = times[k] / T;
+    v[i] -= drift[0] * a;
+    v[i + 1] -= drift[1] * a;
+    v[i + 2] -= drift[2] * a;
+  }
+  const target = [hipsForward / metresPerUnit, 0, -footBelowHips / metresPerUnit];
+  const shift = [target[0] - v[0], target[1] - v[1], target[2] - v[2]];
+  for (let i = 0; i < n; i += 3) {
+    v[i] += shift[0];
+    v[i + 1] += shift[1];
+    v[i + 2] += shift[2];
+  }
+  return riseSpeed;
+}
+
 /** Moves every frame of the Hips horizontally by (df, ds) track units. */
 function shiftHorizontal(clip: THREE.AnimationClip, df: number, ds: number) {
   const v = hipsTrack(clip).values;
@@ -84,6 +133,8 @@ export type PreparedClips = {
   seatedRootOffset: THREE.Vector3;
   /** Forward travel removed from `fall_roll`; the capsule follows it during the roll. */
   rollCurve: RootCurve;
+  /** How fast `climb_ladder` rises at timeScale 1 (m/s), before its rise was removed. */
+  climbRiseSpeed: number;
 };
 
 /**
@@ -120,7 +171,12 @@ export function prepareClips(
   const rollCurve = forwardCurve(clips.fall_roll, metresPerUnit);
 
   // Locomotion loops and the rest: horizontal travel is driven by the capsule.
-  for (const name of ["idle", "walk", "run", "climb_ladder", "jump_down", "jump_down_2", "fall_roll"] as const) {
+  // Measured with scripts/clip-limbs.mjs: at frame 0 the lowest foot is 0.166 m below the Hips,
+  // and the Hips hang ~0.085 m behind the hands/feet. Hips 0.02 m behind the root puts the
+  // hands and feet at the capsule's front (radius 0.06), i.e. on the ledge face or the rungs.
+  const climbRiseSpeed = normalizeClimb(clips.climb_ladder, metresPerUnit, 0.166, -0.02);
+
+  for (const name of ["idle", "walk", "run", "jump_down", "jump_down_2", "fall_roll"] as const) {
     stripHorizontal(clips[name]);
   }
   // Height comes from physics; keep the crouches (real knee bends on the ground).
@@ -131,5 +187,6 @@ export function prepareClips(
     clips,
     seatedRootOffset: new THREE.Vector3(-sitShift[0] * metresPerUnit, 0, -sitShift[1] * metresPerUnit),
     rollCurve,
+    climbRiseSpeed,
   };
 }

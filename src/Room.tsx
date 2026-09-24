@@ -1,8 +1,9 @@
 "use client";
 
 import { useGLTF } from "@react-three/drei";
+import { useFrame } from "@react-three/fiber";
 import { ConvexHullCollider, CuboidCollider, RigidBody } from "@react-three/rapier";
-import { useLayoutEffect, useMemo } from "react";
+import { useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { ASSETS } from "./config";
 import { runtime } from "./store";
@@ -17,6 +18,12 @@ export type BoxCollider = {
 
 /** Every active COL_* node as an oriented box (world space). Read by the controller and debug views. */
 export const roomColliders: BoxCollider[] = [];
+
+/** Room collider metadata by Rapier collider handle (filled as the colliders mount). */
+export const colliderMeta = new Map<number, BoxCollider>();
+
+/** Beanbag squash: set `bounceAt` to the clock time of a bounce. */
+export const beanbag = { bounceAt: -Infinity, clock: () => 0 };
 
 /** GLTFLoader sanitises node names ("COL_Floor slab" → "COL_Floor_slab"); the Blender name is kept here. */
 export const blenderName = (obj: THREE.Object3D) => (obj.userData.name as string | undefined) ?? obj.name;
@@ -80,6 +87,31 @@ function buildColliders(scene: THREE.Object3D): BoxCollider[] {
 export function Room() {
   const { scene } = useGLTF(ASSETS.room, ASSETS.draco);
 
+  const bag = useMemo(() => {
+    let found: THREE.Object3D | undefined;
+    scene.traverse((o) => {
+      if (blenderName(o) === BEANBAG_VISUAL) found = o;
+    });
+    return found ? { obj: found, pos: found.position.clone(), scale: found.scale.clone() } : null;
+  }, [scene]);
+
+  // Squash on bounce: Y 0.85 → 1 with a slight XZ bulge over 0.25 s, pivoting on the floor.
+  const clock = useRef(0);
+  useFrame((_, dt) => {
+    clock.current += dt;
+    if (!bag) return;
+    const t = (clock.current - beanbag.bounceAt) / 0.25;
+    const k = t >= 0 && t < 1 ? (1 - t) * (1 - t) : 0;
+    const sy = 1 - 0.15 * k;
+    const sxz = 1 + 0.07 * k;
+    bag.obj.scale.set(bag.scale.x * sxz, bag.scale.y * sy, bag.scale.z * sxz);
+    const bottom = bag.pos.y - bag.scale.y * 0.25; // mesh local min y is -0.25
+    bag.obj.position.y = bottom + (bag.pos.y - bottom) * sy;
+  });
+  useLayoutEffect(() => {
+    beanbag.clock = () => clock.current;
+  }, []);
+
   const { colliders, hull } = useMemo(() => {
     const list = buildColliders(scene);
     roomColliders.length = 0;
@@ -104,7 +136,16 @@ export function Room() {
     <>
       <primitive object={scene} />
       <RigidBody type="fixed" colliders={false}>
-        {hull && <ConvexHullCollider name={BEANBAG_COLLIDER} args={[hull]} />}
+        {hull && (
+          <ConvexHullCollider
+            name={BEANBAG_COLLIDER}
+            args={[hull]}
+            ref={(c) => {
+              const meta = colliders.find((m) => m.name === BEANBAG_COLLIDER);
+              if (c && meta) colliderMeta.set(c.handle, meta);
+            }}
+          />
+        )}
         {colliders
           .filter((c) => !(hull && c.name === BEANBAG_COLLIDER))
           .map((c) => (
@@ -114,6 +155,9 @@ export function Room() {
             args={[c.halfExtents.x, c.halfExtents.y, c.halfExtents.z]}
             position={c.center}
             quaternion={c.quaternion}
+            ref={(col) => {
+              if (col) colliderMeta.set(col.handle, c);
+            }}
           />
           ))}
       </RigidBody>

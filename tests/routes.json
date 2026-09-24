@@ -1,0 +1,340 @@
+[
+{
+"name": "table -> floor (hop down)",
+"start": [
+0.1,
+0.4,
+0.4,
+-90
+],
+"steps": [
+{
+"z": 1,
+"ms": 1200
+}
+],
+"expectY": 0
+},
+{
+"name": "floor -> table (climb 0.40)",
+"start": [
+0.1,
+0,
+0.9,
+90
+],
+"steps": [
+{
+"z": -1,
+"ms": 2600
+}
+],
+"expectY": 0.398
+},
+{
+"name": "floor -> front couch cushion (climb 0.51)",
+"start": [
+-0.2,
+0,
+0.9,
+180
+],
+"steps": [
+{
+"x": -1,
+"ms": 3200
+}
+],
+"expectY": 0.51
+},
+{
+"name": "floor -> back couch cushion (climb 0.51)",
+"start": [
+-0.2,
+0,
+-0.2,
+180
+],
+"steps": [
+{
+"x": -1,
+"ms": 3200
+}
+],
+"expectY": 0.51
+},
+{
+"name": "front cushion jump -> coin 04 height",
+"start": [
+-0.735,
+0.51,
+0.94,
+90
+],
+"steps": [
+{
+"jump": true,
+"ms": 400
+}
+],
+"expectY": 0.51
+},
+{
+"name": "cushion -> couch-back shelf (climb 0.55)",
+"start": [
+-0.8,
+0.51,
+0.3,
+180
+],
+"steps": [
+{
+"x": -1,
+"ms": 3000
+}
+],
+"expectY": 1.063
+},
+{
+"name": "cushion -> couch-back shelf (jump 0.55)",
+"start": [
+-0.95,
+0.51,
+0.3,
+180
+],
+"steps": [
+{
+"x": -1,
+"jump": true,
+"ms": 500
+},
+{
+"x": -1,
+"ms": 400
+}
+],
+"expectY": 1.063
+},
+{
+"name": "floor -> stool (climb 0.36)",
+"start": [
+-0.235,
+0,
+-0.8,
+90
+],
+"steps": [
+{
+"z": -1,
+"ms": 2400
+}
+],
+"expectY": 0.363
+},
+{
+"name": "floor -> alcove seat (climb 0.51)",
+"start": [
+-0.52,
+0,
+-1.2,
+180
+],
+"steps": [
+{
+"x": -1,
+"ms": 3200
+}
+],
+"expectY": 0.51
+},
+{
+"name": "stool -> alcove seat (jump)",
+"start": [
+-0.1,
+0.363,
+-1.219,
+180
+],
+"steps": [
+{
+"x": -1,
+"run": true,
+"ms": 250
+},
+{
+"x": -1,
+"run": true,
+"jump": true,
+"ms": 450
+},
+{
+"x": -1,
+"ms": 300
+}
+],
+"expectY": 0.51
+},
+{
+"name": "stool -> beanbag (jump, then bounces)",
+"start": [
+-0.1,
+0.363,
+-1.0,
+0
+],
+"steps": [
+{
+"x": 1,
+"run": true,
+"jump": true,
+"ms": 450
+},
+{
+"ms": 100
+}
+],
+"settle": 300,
+"expectY": null
+},
+{
+"name": "beanbag bounce -> beanbag shelf",
+"start": [
+0.8,
+0.75,
+-0.95,
+90
+],
+"steps": [
+{
+"ms": 350
+},
+{
+"z": -1,
+"ms": 700
+}
+],
+"expectY": 1.103
+},
+{
+"name": "beanbag shelf -> right-wall shelf (jump)",
+"start": [
+1.1,
+1.103,
+-1.36,
+-90
+],
+"steps": [
+{
+"z": 1,
+"run": true,
+"ms": 120
+},
+{
+"z": 1,
+"jump": true,
+"ms": 500
+},
+{
+"z": 1,
+"ms": 200
+}
+],
+"expectY": 1.523
+},
+{
+"name": "right-wall shelf -> high back shelf (jump)",
+"start": [
+1.12,
+1.523,
+-1.0,
+90
+],
+"steps": [
+{
+"z": -1,
+"run": true,
+"ms": 80
+},
+{
+"z": -1,
+"jump": true,
+"ms": 500
+},
+{
+"z": -1,
+"ms": 250
+}
+],
+"expectY": 1.973
+},
+{
+"name": "high back shelf -> alcove corner shelf (walk)",
+"start": [
+0.2,
+1.973,
+-1.42,
+180
+],
+"steps": [
+{
+"x": -1,
+"run": true,
+"ms": 1600
+}
+],
+"expectY": 1.978
+},
+{
+"name": "right-wall shelf -> ladder -> door shelf",
+"start": [
+1.11,
+1.523,
+0.2,
+-90
+],
+"steps": [
+{
+"z": 1,
+"ms": 4500
+}
+],
+"settle": 1200,
+"expectY": 2.12,
+"shot": "door"
+},
+{
+"name": "door shelf -> ladder down -> right-wall shelf",
+"start": [
+1.0,
+2.12,
+0.9,
+90
+],
+"steps": [
+{
+"z": -1,
+"ms": 4500
+}
+],
+"settle": 1000,
+"expectY": 1.523
+},
+{
+"name": "right-wall shelf walk off -> floor (roll)",
+"start": [
+1.115,
+1.523,
+-0.2,
+180
+],
+"steps": [
+{
+"x": -1,
+"ms": 1200
+}
+],
+"settle": 1800,
+"expectY": 0
+}
+]

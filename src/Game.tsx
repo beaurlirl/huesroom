@@ -6,10 +6,11 @@ import { Physics } from "@react-three/rapier";
 import { Suspense, useEffect, useRef } from "react";
 import * as THREE from "three";
 import { CameraRig } from "./CameraRig";
+import { DebugView } from "./DebugView";
 import { CAMERA } from "./config";
 import { Hue } from "./Hue";
 import { Lighting } from "./Lighting";
-import { Room } from "./Room";
+import { Room, roomColliders } from "./Room";
 import { runtime, useGame } from "./store";
 import { Overlay } from "./ui/Overlay";
 
@@ -30,7 +31,7 @@ export default function Game() {
   useEffect(() => {
     const debug = new URLSearchParams(window.location.search).has("debug");
     setDebug(debug);
-    if (debug) Object.assign(window, { __hue: { useGame, runtime } });
+    if (debug) Object.assign(window, { __hue: { useGame, runtime, colliders: roomColliders } });
   }, [setDebug]);
 
   return (
@@ -48,6 +49,7 @@ export default function Game() {
             <Room />
             <Hue />
             <CameraRig />
+            {debug && <DebugView />}
           </Physics>
           <SceneReady />
         </Suspense>

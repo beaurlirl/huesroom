@@ -38,4 +38,12 @@ export const runtime = {
   openWallZ: 1.52,
   /** Set once the first clip is bound, playing and evaluated. */
   hueReady: false,
+  /** Controller state for ?debug views and scripted tests. */
+  debug: {
+    mode: "ground" as string,
+    probe: null as null | { active: boolean; from: THREE.Vector3; to: THREE.Vector3; hit: boolean },
+    teleport: null as null | ((x: number, y: number, z: number, yawDeg?: number) => void),
+    /** Scripted input in world directions (x → +X, z → +Z); overrides keys and camera yaw. */
+    input: null as null | { x: number; z: number; run: boolean; jump: boolean },
+  },
 };
