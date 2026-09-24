@@ -32,30 +32,38 @@ for (const side of [0.15, 0.3, 0.45]) {
 /** Mouse-drag peek: offsets the follow rotation, springs back on release. */
 function usePeek() {
   const gl = useThree((s) => s.gl);
-  const peek = useRef({ dragging: false, x0: 0, y0: 0, yaw: 0, pitch: 0, vy: { v: 0 }, vp: { v: 0 } });
+  const peek = useRef({ dragging: false, pointerId: -1, x0: 0, y0: 0, yaw: 0, pitch: 0, vy: { v: 0 }, vp: { v: 0 } });
   useEffect(() => {
     const el = gl.domElement;
     const p = peek.current;
     const down = (e: PointerEvent) => {
-      if (e.pointerType !== "mouse") return; // touch peek lives with the touch controls
+      // Mouse: drag anywhere. Touch: drag on the empty right half (the joystick owns the left).
+      if (e.pointerType !== "mouse" && e.clientX < window.innerWidth / 2) return;
+      if (p.dragging) return;
       p.dragging = true;
+      p.pointerId = e.pointerId;
       p.x0 = e.clientX - p.yaw / C.peekPerPixel;
       p.y0 = e.clientY - p.pitch / C.peekPerPixel;
     };
     const move = (e: PointerEvent) => {
-      if (!p.dragging) return;
+      if (!p.dragging || e.pointerId !== p.pointerId) return;
       p.yaw = clamp(-(e.clientX - p.x0) * C.peekPerPixel, -C.peekYaw, C.peekYaw);
       p.pitch = clamp(-(e.clientY - p.y0) * C.peekPerPixel, -C.peekPitch, C.peekPitch);
     };
-    const up = () => (p.dragging = false);
+    const up = (e?: Event) => {
+      if (e instanceof PointerEvent && e.pointerId !== p.pointerId) return;
+      p.dragging = false;
+    };
     el.addEventListener("pointerdown", down);
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
     window.addEventListener("blur", up);
     return () => {
       el.removeEventListener("pointerdown", down);
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
       window.removeEventListener("blur", up);
     };
   }, [gl]);

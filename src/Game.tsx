@@ -9,7 +9,8 @@ import { AssetGate } from "./AssetGate";
 import { bookBodies, Books } from "./Books";
 import { CameraRig } from "./CameraRig";
 import { Coins } from "./Coins";
-import { Hud } from "./Hud";
+import { Hud, useIsTouch } from "./Hud";
+import { useTouchInput } from "./input";
 import { useHotkeys } from "./input/hotkeys";
 import { DebugView } from "./DebugView";
 import { Effects } from "./Effects";
@@ -17,6 +18,7 @@ import { CAMERA } from "./config";
 import { Hue } from "./Hue";
 import { Lighting } from "./Lighting";
 import { Room, roomColliders } from "./Room";
+import { TouchControls } from "./TouchControls";
 import { runtime, useGame } from "./store";
 import { Overlay } from "./ui/Overlay";
 
@@ -56,6 +58,7 @@ export default function Game() {
   const paused = useGame((s) => s.paused);
   const phase = useGame((s) => s.phase);
   useHotkeys();
+  const coarse = useIsTouch();
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -77,7 +80,7 @@ export default function Game() {
     <div className="fixed inset-0 bg-white">
       <Canvas
         shadows={{ type: THREE.PCFSoftShadowMap }}
-        dpr={[1, 2]}
+        dpr={coarse ? [1, 1.5] : [1, 2]}
         camera={{
           fov: CAMERA.fov,
           near: CAMERA.near,
@@ -115,6 +118,7 @@ export default function Game() {
         </Suspense>
         {debug && <Stats />}
       </Canvas>
+      <TouchControls />
       <Hud />
       <Overlay />
     </div>
