@@ -7,8 +7,8 @@ export const theme = {
   font: "var(--ui-font)",
   /** For canvas: the resolved @font-face family is read from this CSS variable at draw time. */
   fontVar: "--font-union",
-  wordmark: "hue's room",
-  loadingMark: "hue's room",
+  wordmark: "hue leaves home",
+  loadingMark: "hue leaves home",
   ink: "#0a0a0a",
   paper: "#ffffff",
   blue: "#0047ff",

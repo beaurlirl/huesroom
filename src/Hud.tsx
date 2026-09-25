@@ -121,7 +121,7 @@ export function WinPanel({ share }: { share?: React.ReactNode }) {
   const restart = useGame((s) => s.restart);
   if (!result) return null;
   return (
-    <Veil right={`all ${COIN_COUNT} coins`}>
+    <Veil right={`location 01 · home · all ${COIN_COUNT} coins`}>
       <div className="flex w-full max-w-md flex-col gap-6">
         <div className="flex flex-col gap-2">
           <span className="ui-label">your time</span>
@@ -129,6 +129,12 @@ export function WinPanel({ share }: { share?: React.ReactNode }) {
           <span className="text-sm">{result.isBest ? "new best time" : `best ${formatTime(result.best)}`}</span>
         </div>
         <UnlockCard />
+        {/* Where he goes next: this room is stop one of Hue's journey (user request). */}
+        <div className="flex items-start gap-3" style={{ animation: "ui-rise 0.6s ease-out 0.9s both" }}>
+          <span className="ui-label mt-0.5 whitespace-nowrap">next</span>
+          <span className="ui-rule mt-1.5 w-8 shrink-0" />
+          <span className="text-sm leading-snug">follow along for the next locations hue gets to</span>
+        </div>
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
           <Btn onClick={restart}>play again</Btn>
           {share}

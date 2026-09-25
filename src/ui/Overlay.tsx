@@ -13,7 +13,9 @@ export function Overlay() {
   const setPhase = useGame((s) => s.setPhase);
   const { progress } = useProgress();
   const touch = useIsTouch();
-  const [titleOut, setTitleOut] = useState(false);
+  const runId = useGame((s) => s.runId);
+  // "card": the title card on white; "reveal": fading out to Hue on the chair.
+  const [stage, setStage] = useState<"card" | "reveal">("card");
   const [pad, setPad] = useState(false);
   useEffect(() => {
     // Browsers only report a pad after its first button press, so poll as well as listen.
@@ -27,24 +29,24 @@ export function Overlay() {
       window.removeEventListener("gamepaddisconnected", check);
     };
   }, []);
-  const titleVisible = phase === "intro" && !titleOut;
-
-  // Intro timeline.
+  // Intro timeline: title card on white → fade out to Hue on the chair → begin prompt.
+  // Replays (Play again / R) skip the card so they stay quick.
   useEffect(() => {
     if (phase !== "intro") return;
-    const hide = setTimeout(() => setTitleOut(true), (INTRO.fadeFromWhite + INTRO.titleHold) * 1000);
+    const hold = runId === 0 ? INTRO.cardHold : 0;
+    const reveal = setTimeout(() => setStage("reveal"), hold * 1000);
     const ready = setTimeout(
       () => {
         setPhase("ready");
-        setTitleOut(false);
+        setStage("card");
       },
-      (INTRO.fadeFromWhite + INTRO.titleHold + INTRO.titleFadeOut) * 1000,
+      (hold + INTRO.fadeFromWhite) * 1000,
     );
     return () => {
-      clearTimeout(hide);
+      clearTimeout(reveal);
       clearTimeout(ready);
     };
-  }, [phase, setPhase]);
+  }, [phase, setPhase, runId]);
 
   // Any key / tap begins.
   useEffect(() => {
@@ -62,7 +64,8 @@ export function Overlay() {
   }, [phase, setPhase]);
 
   const loading = phase === "loading";
-  const white = loading || phase === "resetting";
+  const card = phase === "intro" && stage === "card" && runId === 0;
+  const white = loading || phase === "resetting" || (phase === "intro" && stage === "card");
 
   const prompt = touch ? "tap to begin" : pad ? "press A to begin" : "press any key";
 
@@ -77,6 +80,25 @@ export function Overlay() {
           transition: `opacity ${phase === "resetting" ? RESET_FADE_MS / 1000 : INTRO.fadeFromWhite}s ease-in-out`,
         }}
       >
+        {/* Title card: fades in on white, then leaves with the white layer. */}
+        {(card || (phase === "intro" && runId === 0)) && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 px-6 text-center">
+            <h1
+              className="text-5xl font-bold leading-[0.9] sm:text-7xl md:text-8xl"
+              style={{ animation: `ui-fade ${INTRO.titleIn}s ease-out both` }}
+            >
+              {theme.wordmark}
+            </h1>
+            <div
+              className="flex items-center gap-3 text-sm sm:text-base"
+              style={{ color: theme.muted, animation: `ui-fade ${INTRO.creditIn}s ease-out ${INTRO.creditDelay}s both` }}
+            >
+              <span className="ui-rule hidden w-10 sm:block" />
+              <span>{INTRO.credit}</span>
+              <span className="ui-rule hidden w-10 sm:block" />
+            </div>
+          </div>
+        )}
         <div className="flex w-64 flex-col gap-3" style={{ opacity: loading ? 1 : 0, transition: "opacity 0.3s" }}>
           <span className="text-3xl font-bold leading-none">{theme.loadingMark}</span>
           <div className="relative h-px w-full" style={{ background: "rgba(10,10,10,0.15)" }}>
@@ -86,26 +108,6 @@ export function Overlay() {
             <span>loading</span>
             <span className="tabular-nums">{String(Math.round(progress)).padStart(3, "0")}%</span>
           </div>
-        </div>
-      </div>
-
-      {/* Title: a blue-glass plate in the upper third, clear of Hue in the chair. */}
-      <div
-        className="absolute inset-x-0 flex justify-center px-4"
-        style={{
-          top: "18%",
-          opacity: titleVisible ? 1 : 0,
-          transform: titleVisible ? "none" : "translateY(-6px)",
-          transition: `opacity ${titleVisible ? 0.6 : INTRO.titleFadeOut}s ease-in-out, transform 0.6s ease-out`,
-        }}
-      >
-        <div className="glass flex flex-col gap-3 px-6 py-5 sm:px-8">
-          <div className="ui-label flex items-center gap-3">
-            <span>a hue game</span>
-            <span className="ui-rule w-10" />
-            <span>11 coins</span>
-          </div>
-          <h1 className="text-5xl font-bold leading-[0.9] sm:text-7xl">{theme.wordmark}</h1>
         </div>
       </div>
 

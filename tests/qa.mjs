@@ -9,7 +9,7 @@ const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } })
 const page = await ctx.newPage();
 page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
 page.on('console', (m) => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
-page.on('requestfailed', (r) => errors.push('requestfailed: ' + r.url()));
+page.on('requestfailed', (r) => { if (!/ERR_ABORTED/.test(r.failure()?.errorText ?? '')) errors.push('requestfailed: ' + r.url() + ' ' + r.failure()?.errorText); }); // streamed music is cut off on reload: not an error
 page.on('response', (r) => { if (r.status() >= 400) errors.push(`HTTP ${r.status()}: ${r.url()}`); });
 
 await page.goto(URL);

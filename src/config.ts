@@ -224,8 +224,18 @@ export const CAMERA = {
   portraitMaxVFov: 70,
 };
 
+/**
+ * Opening (user request): on white, the title fades in, then the credit line; hold; then the
+ * whole card fades out to Hue on the chair, and the begin prompt appears. Restarts skip the
+ * card and just fade from white.
+ */
 export const INTRO = {
-  fadeFromWhite: 1.5,
-  titleHold: 1.2,
-  titleFadeOut: 0.6,
+  titleIn: 1.1,
+  creditDelay: 0.9,
+  creditIn: 1.0,
+  /** Seconds from the start of the intro until the card begins to fade out. */
+  cardHold: 3.8,
+  /** White card → the room. */
+  fadeFromWhite: 1.8,
+  credit: "A game developed by Gest in Lower Manhattan",
 };

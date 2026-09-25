@@ -15,19 +15,19 @@ const union = localFont({
 // Absolute URLs for link previews. The game is expected at hue.onl/huesroom (NEXT_PUBLIC_BASE_PATH).
 const site = process.env.NEXT_PUBLIC_SITE_URL ?? "https://hue.onl";
 const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
-const description = "Help Hue collect all 11 coins, as fast as you can.";
+const description = "Hue leaves home. Collect all 11 coins, as fast as you can, and unlock hue.onl. A game by Gest, Lower Manhattan.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(site),
-  title: "hue's room",
+  title: "Hue Leaves Home",
   description,
   openGraph: {
-    title: "hue's room",
+    title: "Hue Leaves Home",
     description,
     url: `${base}/`,
-    images: [{ url: `${base}/og.jpg`, width: 1200, height: 630, alt: "Hue sitting on a tiny chair in a green graffiti room" }],
+    images: [{ url: `${base}/og.jpg`, width: 1200, height: 630, alt: "Hue Leaves Home — a game developed by Gest in Lower Manhattan" }],
   },
-  twitter: { card: "summary_large_image", title: "hue's room", description, images: [`${base}/og.jpg`] },
+  twitter: { card: "summary_large_image", title: "Hue Leaves Home", description, images: [`${base}/og.jpg`] },
 };
 
 export const viewport: Viewport = {

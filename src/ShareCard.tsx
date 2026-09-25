@@ -203,7 +203,7 @@ export function ShareButton() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "hues-room.png";
+    a.download = "hue-leaves-home.png";
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 5000);
     try {
@@ -220,7 +220,7 @@ export function ShareButton() {
     try {
       const blob = card?.time === result.time ? card.blob : await renderShareCard(result.time);
       if (!blob) return;
-      const file = new File([blob], "hues-room.png", { type: "image/png" });
+      const file = new File([blob], "hue-leaves-home.png", { type: "image/png" });
       const text = shareCaption(result.time);
       // Phones get the share sheet (Instagram Stories/Feed/DM live there). Desktop browsers
       // may support file sharing too, but the prompt wants download + caption there.
