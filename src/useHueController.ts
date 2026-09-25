@@ -228,7 +228,7 @@ class HueMover {
     } else if (FLAGS.DOUBLE_JUMP && jumpPressed && this.mode === "air" && this.jumped && !this.doubleUsed) {
       this.doubleUsed = true;
       this.vel.y = MOVE.jumpSpeed * CLIMB.doubleJumpScale;
-      this.anim.play("jump", { from: CLIP_TIMES.jumpTakeoff, timeScale: 1.2, holdAt: CLIP_TIMES.jumpAirHold, restart: true, fade: 0.08 });
+      this.anim.play("jump", { from: CLIP_TIMES.jumpTakeoff, timeScale: CLIP_TIMES.jumpClipScale, holdAt: CLIP_TIMES.jumpAirHold, restart: true, fade: 0.08 });
     }
     // Short hop: releasing Space early cuts the upward speed.
     if (this.jumped && !this.shortHopCut && !input.jump && this.vel.y > 0) {
@@ -271,7 +271,9 @@ class HueMover {
     }
 
     // Gravity.
-    this.vel.y = Math.max(this.vel.y - MOVE.gravity * dt, -MOVE.maxFallSpeed);
+    // Jump arcs (take-off or bounce) use the slower jump gravity; plain falls use normal gravity.
+    const g = this.mode === "air" && this.jumped ? MOVE.jumpGravity : MOVE.gravity;
+    this.vel.y = Math.max(this.vel.y - g * dt, -MOVE.maxFallSpeed);
     const vyBefore = this.vel.y;
 
     const desired = { x: this.vel.x * dt, y: this.vel.y * dt, z: this.vel.z * dt };
@@ -359,7 +361,7 @@ class HueMover {
     this.landing = null;
     this.airTime = MOVE.airPoseDelay; // already in the air pose
     this.peakY = this.feet.y;
-    this.anim.play("jump", { from: CLIP_TIMES.jumpTakeoff, timeScale: 1.2, holdAt: CLIP_TIMES.jumpAirHold, restart: true, fade: 0.08 });
+    this.anim.play("jump", { from: CLIP_TIMES.jumpTakeoff, timeScale: CLIP_TIMES.jumpClipScale, holdAt: CLIP_TIMES.jumpAirHold, restart: true, fade: 0.08 });
   }
 
   private updateMode(dt: number, wasGrounded: boolean, inputMag: number, run: boolean, vyBefore: number) {
@@ -391,7 +393,7 @@ class HueMover {
       const meta = under ? colliderMeta.get(under.handle) : undefined;
       if (meta?.userData.bounce_pad && vyBefore < 0) {
         const apex = (meta.userData.bounce_apex_m as number | undefined) ?? 0.9;
-        this.takeOff(Math.sqrt(2 * MOVE.gravity * apex));
+        this.takeOff(Math.sqrt(2 * MOVE.jumpGravity * apex));
         this.shortHopCut = true; // holding Space adds nothing, releasing takes nothing
         beanbag.bounceAt = beanbag.clock();
         playSfx("boing");
@@ -445,7 +447,7 @@ class HueMover {
       a.play("idle");
     } else if (!run || s < (MOVE.walkSpeed + MOVE.runSpeed) / 2) {
       a.play("walk");
-      a.setTimeScale(THREE.MathUtils.clamp(s / CLIP_TIMES.walkSpeedAtScale1, 0.5, 1.8));
+      a.setTimeScale(THREE.MathUtils.clamp(s / CLIP_TIMES.walkSpeedAtScale1, 0.5, 2.4));
     } else {
       a.play("run");
       a.setTimeScale(CLIP_TIMES.runTimeScale * THREE.MathUtils.clamp(s / MOVE.runSpeed, 0.6, 1.2));

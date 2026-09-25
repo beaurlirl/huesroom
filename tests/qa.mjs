@@ -87,7 +87,7 @@ check('keyboard play collects coin 01', s4.collected >= 1, `feet ${s4.feet} coll
 const beforeJump = await state();
 await page.keyboard.down('Space');
 let peak = 0;
-for (let i = 0; i < 20; i++) { await page.waitForTimeout(20); peak = Math.max(peak, (await state()).feet[1]); }
+for (let i = 0; i < 45; i++) { await page.waitForTimeout(20); peak = Math.max(peak, (await state()).feet[1]); }
 await page.keyboard.up('Space');
 await page.waitForTimeout(600);
 check('Space jumps ~0.6 m', peak - beforeJump.feet[1] > 0.45 && peak - beforeJump.feet[1] < 0.7, `rise ${(peak - beforeJump.feet[1]).toFixed(2)} m`);
@@ -116,7 +116,7 @@ await page.waitForTimeout(300);
   const y0 = (await state()).feet[1];
   await page.keyboard.down('Space');
   let top = y0;
-  for (let i = 0; i < 20; i++) { await page.waitForTimeout(20); top = Math.max(top, (await state()).feet[1]); }
+  for (let i = 0; i < 45; i++) { await page.waitForTimeout(20); top = Math.max(top, (await state()).feet[1]); }
   await page.keyboard.up('Space');
   await page.waitForTimeout(600);
   check('can jump after restarting mid-air', top - y0 > 0.4, `rise ${(top - y0).toFixed(2)} m`);

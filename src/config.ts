@@ -50,13 +50,19 @@ export const MOVE = {
   autostepMinWidth: 0.04,
   snapToGround: 0.04,
   maxSlope: (45 * Math.PI) / 180,
-  walkSpeed: 0.25,
+  walkSpeed: 0.5, // 2x the prompt's 0.25 (user request)
   runSpeed: 0.8,
   accelTime: 0.12,
   turnRate: 12,
   gravity: 16,
-  jumpSpeed: 4.4,
-  airSpeed: 1.2,
+  /**
+   * Jumps (and beanbag bounces) play at half speed: same 0.6 m apex, twice the air time.
+   * Time ×2 → gravity ÷4 and take-off speed ÷2 (4.4 → 2.2 m/s). Walking off a ledge still
+   * falls with the normal gravity above.
+   */
+  jumpGravity: 4,
+  jumpSpeed: 2.2,
+  airSpeed: 0.6, // halved with the slower jump: same arc and reach, at half speed
   airControl: 0.8,
   coyoteTime: 0.1,
   jumpBuffer: 0.1,
@@ -107,6 +113,8 @@ export const LANDING = {
 /** Hand-picked moments inside the clips (seconds), from scripts/clip-timeline.mjs. */
 export const CLIP_TIMES = {
   walkSpeedAtScale1: 0.24, // walk clip travels 0.39 m per 1.63 s loop
+  /** The jump clip's air section plays at this speed (0.6 before jumps were slowed 2x). */
+  jumpClipScale: 0.6,
   runTimeScale: 1.3,
   jumpTakeoff: 0.55, // end of the crouch
   jumpAirHold: 0.88, // tucked, mid-air
@@ -181,6 +189,13 @@ export const CAMERA = {
   peekPitch: (12 * Math.PI) / 180,
   peekPerPixel: 0.004,
   peekReturn: 0.4,
+  /** Beanbag corner zone (feet x > minX and z < maxZ): camera moves to the top-left. */
+  cornerMinX: 0.25,
+  cornerMaxZ: -0.45,
+  /** Camera x = -(Hue x) × this, i.e. mirrored to the left side of the open wall. */
+  cornerMirror: 1,
+  cornerCamY: 2.1,
+  cornerBlend: 0.6,
   portraitMinHFov: 55,
   portraitMaxVFov: 70,
 };

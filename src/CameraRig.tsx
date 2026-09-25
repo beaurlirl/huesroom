@@ -80,6 +80,8 @@ export function CameraRig() {
   const peek = usePeek();
   const s = useRef({
     unblock: new THREE.Vector2(),
+    cornerW: 0,
+    vcw: { v: 0 },
     vux: { v: 0 },
     vuy: { v: 0 },
     initialised: false,
@@ -105,8 +107,18 @@ export function CameraRig() {
     const d = clamp(runtime.openWallZ - feet.z, 0, C.roomDepth);
     let y = st.refY + THREE.MathUtils.lerp(C.offsetNear, C.offsetFar, d / C.roomDepth);
     if (d < C.frontEdge) y += C.frontEdgeLift * (C.frontEdge - d);
+    let x = clamp(feet.x, -C.xClamp, C.xClamp);
+
+    // Beanbag corner (back right): following from the right side loses him behind the bag and
+    // off the top of the frame when he bounces, so blend to the top-left of the open wall and
+    // look down across the room instead (user request).
+    const w = st.cornerW;
+    if (w > 0.001) {
+      x = THREE.MathUtils.lerp(x, clamp(-feet.x * C.cornerMirror, -C.xClamp, C.xClamp), w);
+      y = THREE.MathUtils.lerp(y, Math.max(y, C.cornerCamY), w);
+    }
     return {
-      x: clamp(feet.x, -C.xClamp, C.xClamp),
+      x,
       y: clamp(y, C.yMin, C.yMax),
       look: new THREE.Vector3(feet.x, feet.y + C.chestHeight, feet.z),
       d,
@@ -174,6 +186,9 @@ export function CameraRig() {
     }
     if (!st.initialised) return;
 
+    const f = runtime.feet;
+    const inCorner = f.x > C.cornerMinX && f.z < C.cornerMaxZ;
+    st.cornerW = clamp(smoothDamp(st.cornerW, inCorner ? 1 : 0, st.vcw, C.cornerBlend, dt), 0, 1);
     const t = targets(st);
     st.x = smoothDamp(st.x, t.x, st.vx, C.smoothX, dt);
     st.y = smoothDamp(st.y, t.y, st.vy, C.smoothY, dt);
