@@ -4,21 +4,15 @@
 // falls back to a small Web Audio synth (also used until a clip finishes loading).
 
 import { create } from "zustand";
-import { asset } from "../config";
 
 export type SfxName = "chime" | "boing" | "thud" | "win" | "step";
 
 /**
- * Clips: name → base path (".ogg" (Opus) and ".mp3" siblings). Anything not listed uses the
- * synth fallback: the music loop (no music MP3 exists on the Mac) and footsteps.
- * Sources and processing: public/audio/CREDITS.md.
+ * Clips: name → base path (".ogg" (Opus) and ".mp3" siblings, in public/audio/). Anything not
+ * listed uses the Web Audio synth below. Empty for now: the owner's own MP3s go here once
+ * they're on this machine (the Adobe starter clips were removed at their request).
  */
-const AUDIO_FILES: Partial<Record<SfxName | "music", string>> = {
-  chime: asset("/audio/chime"),
-  boing: asset("/audio/boing"),
-  thud: asset("/audio/thud"),
-  win: asset("/audio/win"),
-};
+const AUDIO_FILES: Partial<Record<SfxName | "music", string>> = {};
 
 const MUTE_KEY = "huesroom.mute";
 
@@ -80,8 +74,9 @@ async function loadClip(name: string, base: string) {
   }
 }
 
-/** Names of clips decoded so far (for ?test checks). */
+/** Names of clips decoded so far, and the ones listed (for ?test checks). */
 export const loadedClips = () => [...buffers.keys()];
+export const listedClips = () => Object.keys(AUDIO_FILES);
 
 /**
  * Creates/resumes the audio context. Call from a user gesture (the begin press). With

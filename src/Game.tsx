@@ -7,7 +7,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { AssetGate } from "./AssetGate";
 import { AudioDirector } from "./audio/AudioDirector";
-import { loadedClips } from "./audio/sfx";
+import { listedClips, loadedClips } from "./audio/sfx";
 import { bookBodies, Books } from "./Books";
 import { pushableBodies } from "./pushables";
 import { CameraRig } from "./CameraRig";
@@ -118,7 +118,7 @@ export default function Game() {
           books: bookBodies,
           pushables: pushableBodies,
           touch: useTouchInput,
-          audio: { loadedClips },
+          audio: { loadedClips, listedClips },
         },
       });
   }, [setDebug]);

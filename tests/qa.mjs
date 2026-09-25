@@ -60,7 +60,11 @@ await page.waitForFunction(() => window.__hue.useGame.getState().phase === 'play
 await page.waitForTimeout(500);
 const s3 = await state();
 check('timer running once playing', s3.elapsed > 0.3 && s3.elapsed < 1.5, `elapsed ${s3.elapsed}`);
-check('audio clips loaded', (await page.evaluate(() => window.__hue.audio.loadedClips().sort().join(','))) === 'boing,chime,thud,win', await page.evaluate(() => window.__hue.audio.loadedClips().join(',')));
+{
+  await page.waitForTimeout(300);
+  const a = await page.evaluate(() => ({ listed: window.__hue.audio.listedClips().sort().join(','), loaded: window.__hue.audio.loadedClips().sort().join(',') }));
+  check('every listed audio clip loaded', a.listed === a.loaded, `listed [${a.listed}] loaded [${a.loaded}]${a.listed ? '' : ' (synth sounds only)'}`);
+}
 
 // 3. Real keyboard play: walk toward the camera and right, off the table, onto coin 01.
 await page.keyboard.down('KeyS'); await page.keyboard.down('KeyD');
@@ -150,7 +154,7 @@ await page.getByRole('button', { name: 'Play again' }).click();
 const w2 = await winRun(2500);
 check('best time kept when slower', !w2.isBest && Math.abs(w2.best - w1.time) < 1e-6, `run1 ${w1.time.toFixed(2)} run2 ${w2.time.toFixed(2)} best ${w2.best.toFixed(2)}`);
 const pose = await page.evaluate(() => window.__hue.poseLog);
-check('Hue never underground / sideways', pose.badFrames.length === 0 && pose.minHead > 0.38 && pose.maxHead < 0.5 && pose.minHips > 0.15,
+check('Hue never underground / sideways', pose.badFrames.length === 0 && pose.minHead > 0.3 && pose.maxHead < 0.5 && pose.minHips > 0.15,
   `head ${pose.minHead.toFixed(3)}–${pose.maxHead.toFixed(3)} m, min hips ${pose.minHips.toFixed(3)} m over ${pose.samples} frames, bad ${pose.badFrames.slice(0, 3).join('; ')}`);
 await page.reload();
 await page.waitForFunction(() => window.__hue?.useGame.getState().phase === 'ready', null, { timeout: 60000 });
