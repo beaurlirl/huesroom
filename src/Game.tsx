@@ -7,7 +7,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { AssetGate } from "./AssetGate";
 import { AudioDirector } from "./audio/AudioDirector";
-import { listedClips, loadedClips } from "./audio/sfx";
+import { listedClips, loadedClips, musicPlaying } from "./audio/sfx";
 import { bookBodies, Books } from "./Books";
 import { pushableBodies } from "./pushables";
 import { CameraRig } from "./CameraRig";
@@ -74,15 +74,15 @@ function hasWebGL() {
 function GraphicsMessage({ text, action }: { text: string; action?: { label: string; onClick: () => void } }) {
   return (
     <div
-      className="fixed inset-0 flex flex-col items-center justify-center gap-4 p-6 text-center"
-      style={{ background: theme.paper, color: theme.ink, fontFamily: theme.font }}
+      className="ui fixed inset-0 flex flex-col items-center justify-center gap-4 p-6 text-center"
+      style={{ background: theme.paper, color: theme.ink }}
     >
-      <div className="text-sm tracking-wide">{theme.wordmark}</div>
+      <div className="text-2xl font-bold">{theme.wordmark}</div>
       <p className="max-w-xs text-sm" style={{ color: theme.muted }}>
         {text}
       </p>
       {action && (
-        <button type="button" onClick={action.onClick} className="rounded-full px-5 py-2 text-sm" style={{ background: theme.ink, color: theme.paper }}>
+        <button type="button" onClick={action.onClick} className="ui-cta text-sm" style={{ background: theme.blue, color: theme.paper, borderColor: theme.blue }}>
           {action.label}
         </button>
       )}
@@ -118,7 +118,7 @@ export default function Game() {
           books: bookBodies,
           pushables: pushableBodies,
           touch: useTouchInput,
-          audio: { loadedClips, listedClips },
+          audio: { loadedClips, listedClips, musicPlaying },
         },
       });
   }, [setDebug]);

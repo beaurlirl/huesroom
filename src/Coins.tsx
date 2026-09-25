@@ -25,7 +25,8 @@ type Coin = {
 };
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
-const SMOKE_GREY = new THREE.Color("#cfd2d6");
+const SMOKE = new THREE.Color(COINS.smokeColor);
+const GLINT = new THREE.Color(COINS.glintColor).multiplyScalar(COINS.glintBoost);
 
 function newGlint(): Glint {
   // A random point on the ring (r ≈ 0.058) or on the G's strokes (r ≈ 0.02–0.045).
@@ -85,6 +86,11 @@ export function Coins() {
       const material = (mesh.material as THREE.MeshPhysicalMaterial).clone();
       material.envMap = coinEnv;
       material.envMapIntensity = COINS.envMapIntensity;
+      // Rich polished gold (user request) instead of the glb's silver chrome.
+      material.color.setRGB(...COINS.goldLinear, THREE.LinearSRGBColorSpace);
+      material.metalness = 1;
+      material.roughness = COINS.roughness;
+      material.emissive.setRGB(...COINS.emissiveLinear, THREE.LinearSRGBColorSpace);
       material.transparent = true;
       mesh.material = material;
       mesh.castShadow = true;
@@ -214,7 +220,7 @@ export function Coins() {
           glintBatch.scale[gi] = g.size * Math.sin(Math.PI * k);
           glintBatch.rotation[gi] = g.rot + THREE.MathUtils.degToRad(20) * k;
           glintBatch.opacity[gi] = 1;
-          glintBatch.color.set([COINS.glintBoost, COINS.glintBoost, COINS.glintBoost], gi * 3);
+          glintBatch.color.set([GLINT.r, GLINT.g, GLINT.b], gi * 3);
           gi++;
         }
       }
@@ -242,7 +248,7 @@ export function Coins() {
         smokeBatch.rotation[si] = pf.rot + pf.spin * pf.age;
         smokeBatch.opacity[si] = pf.peak * Math.sin(Math.PI * k) * flicker;
         smokeBatch.tex[si] = pf.tex;
-        smokeBatch.color.set([SMOKE_GREY.r, SMOKE_GREY.g, SMOKE_GREY.b], si * 3);
+        smokeBatch.color.set([SMOKE.r, SMOKE.g, SMOKE.b], si * 3);
         si++;
       }
     }

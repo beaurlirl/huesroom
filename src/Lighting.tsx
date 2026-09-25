@@ -50,6 +50,10 @@ export function Lighting() {
         shadow-camera-near={1}
         shadow-camera-far={8}
       />
+      {/* Cool rim from high behind: separates Hue (and the coins) from the busy murals. */}
+      <directionalLight color="#d7e4ff" intensity={0.9} position={[-0.8, 2.8, -3]} target={target} />
+      {/* Low warm fill from front-left so the couch side and faces aren't muddy. */}
+      <directionalLight color="#ffe9d2" intensity={0.35} position={[-2.5, 1.2, 2.5]} target={target} />
       {/* Soft warm ceiling light, no shadows. */}
       <pointLight color="#ffe2bd" intensity={1.4} distance={5} decay={2} position={[0, 2.45, -0.2]} />
       <hemisphereLight args={["#fbfaf6", "#6d6a58", 0.45]} />

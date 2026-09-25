@@ -1,11 +1,145 @@
 @import "tailwindcss";
 
+/*
+ * Hue's Room UI — styled after directory.onl: Union, uppercase, hard edges, hairline rules,
+ * bracketed text buttons; panels are frosted "blue glass" over the live room.
+ * Colours and fonts are also mirrored in src/ui/theme.ts for canvas drawing (share card).
+ */
+:root {
+  --ink: #0a0a0a;
+  --paper: #ffffff;
+  --blue: #0047ff;
+  --blue-soft: #7aa2ff;
+  --muted: rgba(10, 10, 10, 0.55);
+  --glass-text: #ffffff;
+  --glass-bg: linear-gradient(140deg, rgba(70, 125, 255, 0.5) 0%, rgba(0, 71, 255, 0.38) 55%, rgba(0, 38, 170, 0.46) 100%);
+  --glass-edge: rgba(255, 255, 255, 0.55);
+  --glass-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), inset 0 -1px 0 rgba(0, 20, 90, 0.25),
+    0 10px 40px rgba(0, 25, 110, 0.22);
+  --ui-font: var(--font-union), "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
 html,
 body {
-  background: #ffffff;
-  color: #111111;
+  background: var(--paper);
+  color: var(--ink);
   overscroll-behavior: none;
   touch-action: none;
   -webkit-user-select: none;
   user-select: none;
+  font-family: var(--ui-font);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Everything in the UI speaks directory: Union, uppercase, a touch of tracking. */
+.ui {
+  font-family: var(--ui-font);
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+}
+/* Browsers don't pass text styles into form controls by default. */
+.ui button,
+.ui a {
+  font-family: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+}
+
+/* Blue glass: frosted, tinted, crisp white text on top. Hard edges, like directory. */
+.glass {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(18px) saturate(170%);
+  backdrop-filter: blur(18px) saturate(170%);
+  border: 1px solid var(--glass-edge);
+  box-shadow: var(--glass-shadow);
+  color: var(--glass-text);
+}
+
+/* Full-screen frosted overlay (pause, win): the room blurs behind, like union.link's panels. */
+.glass-veil {
+  background: linear-gradient(160deg, rgba(0, 71, 255, 0.42), rgba(0, 30, 140, 0.58));
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  backdrop-filter: blur(22px) saturate(160%);
+  color: var(--glass-text);
+}
+
+/* Small category label (directory's red/orange/blue kickers). */
+.ui-label {
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  opacity: 0.8;
+}
+
+/* Bracketed text button: (PLAY AGAIN). */
+.ui-btn {
+  font: inherit;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 6px 2px;
+  transition: opacity 0.15s, transform 0.1s;
+}
+.ui-btn:hover {
+  opacity: 0.7;
+}
+.ui-btn:active {
+  transform: scale(0.97);
+}
+.ui-btn::before {
+  content: "(";
+}
+.ui-btn::after {
+  content: ")";
+}
+
+/* Solid primary action: white block with blue text on the glass. */
+.ui-cta {
+  font: inherit;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  background: var(--paper);
+  color: var(--blue);
+  border: 1px solid var(--paper);
+  padding: 12px 18px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, transform 0.1s;
+}
+.ui-cta:hover {
+  background: transparent;
+  color: var(--paper);
+}
+.ui-cta:active {
+  transform: scale(0.98);
+}
+
+.ui-rule {
+  height: 1px;
+  background: currentColor;
+  opacity: 0.6;
+}
+
+@keyframes ui-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes hud-bounce {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.18);
+  }
+  100% {
+    transform: scale(1);
+  }
 }

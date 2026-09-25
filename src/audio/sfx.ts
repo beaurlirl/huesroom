@@ -4,6 +4,7 @@
 // falls back to a small Web Audio synth (also used until a clip finishes loading).
 
 import { create } from "zustand";
+import { asset } from "../config";
 
 export type SfxName = "chime" | "boing" | "thud" | "win" | "step";
 
@@ -12,7 +13,14 @@ export type SfxName = "chime" | "boing" | "thud" | "win" | "step";
  * listed uses the Web Audio synth below. Empty for now: the owner's own MP3s go here once
  * they're on this machine (the Adobe starter clips were removed at their request).
  */
-const AUDIO_FILES: Partial<Record<SfxName | "music", string>> = {};
+const AUDIO_FILES: Partial<Record<SfxName, string>> = {};
+
+/**
+ * The owner's own tracks, played in order and repeating. Streamed through an <audio> element
+ * rather than decoded: a 4-minute song decoded into an AudioBuffer is ~85 MB, too much for
+ * phones. See public/audio/CREDITS.md.
+ */
+const PLAYLIST = [asset("/audio/music"), asset("/audio/riff")];
 
 const MUTE_KEY = "huesroom.mute";
 
@@ -194,7 +202,6 @@ export function playSfx(name: SfxName, { pitch = 1, volume = 1 }: { pitch?: numb
 // ------------------------------------------------------------------ music
 
 let musicTimer: ReturnType<typeof setInterval> | null = null;
-let musicSource: AudioBufferSourceNode | null = null;
 let nextBar = 0;
 let bar = 0;
 
@@ -232,17 +239,41 @@ function scheduleBar(t: number, notes: number[]) {
   tone(notes[3] * 2, "sine", t + BAR / 2, 0.01, 0.02, 1.6, musicBus!);
 }
 
-export function startMusic() {
-  if (!ctx || !musicBus || musicTimer || musicSource) return;
-  const buf = buffers.get("music");
-  if (buf) {
-    musicSource = ctx.createBufferSource();
-    musicSource.buffer = buf;
-    musicSource.loop = true;
-    musicSource.connect(musicBus);
-    musicSource.start();
-    return;
+let musicEl: HTMLAudioElement | null = null;
+let track = 0;
+
+/** Streams the playlist through the music bus (so mute/volume apply); synth pad if it fails. */
+function startTrack() {
+  if (!ctx || !musicBus) return false;
+  const el = new Audio();
+  const ext = el.canPlayType('audio/ogg; codecs="opus"') ? "ogg" : "mp3";
+  el.src = `${PLAYLIST[track % PLAYLIST.length]}.${ext}`;
+  el.preload = "auto";
+  try {
+    ctx.createMediaElementSource(el).connect(musicBus);
+  } catch {
+    return false;
   }
+  // Next track when this one ends (one element, re-pointed, so the audio graph stays put).
+  el.addEventListener("ended", () => {
+    track++;
+    el.src = `${PLAYLIST[track % PLAYLIST.length]}.${ext}`;
+    void el.play().catch(() => {});
+  });
+  el.addEventListener("error", () => {
+    musicEl = null;
+    startPad();
+  });
+  void el.play().catch(() => {
+    // Autoplay refused (no gesture yet): the next unlock gesture retries.
+    musicEl = null;
+  });
+  musicEl = el;
+  return true;
+}
+
+function startPad() {
+  if (!ctx || musicTimer) return;
   nextBar = ctx.currentTime + 0.1;
   const tick = () => {
     while (ctx && nextBar < ctx.currentTime + 1.5) {
@@ -255,8 +286,21 @@ export function startMusic() {
   musicTimer = setInterval(tick, 500);
 }
 
+export function startMusic() {
+  if (!ctx || !musicBus || musicTimer || musicEl) return;
+  if (!startTrack()) startPad();
+}
+
+/** Whether the owner's track is the one playing (for ?test checks). */
+export const musicPlaying = () => !!musicEl && !musicEl.paused;
+
 export function setMusicPaused(paused: boolean) {
   if (!ctx) return;
-  if (paused) void ctx.suspend();
-  else void ctx.resume();
+  if (paused) {
+    musicEl?.pause();
+    void ctx.suspend();
+  } else {
+    void ctx.resume();
+    void musicEl?.play().catch(() => {});
+  }
 }

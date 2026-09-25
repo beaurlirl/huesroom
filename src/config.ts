@@ -50,19 +50,20 @@ export const MOVE = {
   autostepMinWidth: 0.04,
   snapToGround: 0.04,
   maxSlope: (45 * Math.PI) / 180,
-  walkSpeed: 0.5, // 2x the prompt's 0.25 (user request)
+  walkSpeed: 0.55, // user requests: 2x the prompt's 0.25, then "slightly faster"
   runSpeed: 0.8,
   accelTime: 0.12,
   turnRate: 12,
   gravity: 16,
   /**
-   * Jumps (and beanbag bounces) play at half speed: same 0.6 m apex, twice the air time.
-   * Time ×2 → gravity ÷4 and take-off speed ÷2 (4.4 → 2.2 m/s). Walking off a ledge still
-   * falls with the normal gravity above.
+   * Jumps (and beanbag bounces) play slower than the prompt's: same 0.6 m apex and reach, at
+   * ~0.57x speed (user: "twice as slow", then "slightly faster"). Time scale k = 0.575 →
+   * gravity 16·k² ≈ 5.3, take-off 4.4·k ≈ 2.53 m/s, air speed 1.2·k ≈ 0.69 m/s. Walking off a
+   * ledge still falls with normal gravity.
    */
-  jumpGravity: 4,
-  jumpSpeed: 2.2,
-  airSpeed: 0.6, // halved with the slower jump: same arc and reach, at half speed
+  jumpGravity: 5.3,
+  jumpSpeed: 2.53,
+  airSpeed: 0.69, // scaled with the slower jump: same arc and reach
   airControl: 0.8,
   coyoteTime: 0.1,
   jumpBuffer: 0.1,
@@ -114,7 +115,7 @@ export const LANDING = {
 export const CLIP_TIMES = {
   walkSpeedAtScale1: 0.24, // walk clip travels 0.39 m per 1.63 s loop
   /** The jump clip's air section plays at this speed (0.6 before jumps were slowed 2x). */
-  jumpClipScale: 0.6,
+  jumpClipScale: 0.69,
   runTimeScale: 1.3,
   jumpTakeoff: 0.55, // end of the crouch
   jumpAirHold: 0.88, // tucked, mid-air
@@ -132,7 +133,13 @@ export const COINS = {
   bob: 0.015,
   bobPeriod: 1.8,
   popTime: 0.2,
-  envMapIntensity: 2.5,
+  envMapIntensity: 1.1,
+  /** Gold (linear RGB, close to measured gold reflectance), slightly satin so it reads rich. */
+  goldLinear: [1.0, 0.46, 0.07] as [number, number, number],
+  roughness: 0.16,
+  emissiveLinear: [0.05, 0.03, 0.005] as [number, number, number],
+  glintColor: "#fff1c9",
+  smokeColor: "#e6d7b4",
   glintsPerCoin: 3,
   glintDur: [0.25, 0.4] as const,
   glintWait: [0.3, 1.2] as const,

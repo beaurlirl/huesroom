@@ -1,8 +1,16 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 
-const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
+// Union, the directory.onl / hue.onl house face (owner's font), used for all UI.
+const union = localFont({
+  src: [
+    { path: "./fonts/Union-Regular.otf", weight: "400", style: "normal" },
+    { path: "./fonts/Union-Bold.otf", weight: "700", style: "normal" },
+  ],
+  variable: "--font-union",
+  display: "swap",
+});
 
 // Absolute URLs for link previews. The game is expected at hue.onl/huesroom (NEXT_PUBLIC_BASE_PATH).
 const site = process.env.NEXT_PUBLIC_SITE_URL ?? "https://hue.onl";
@@ -33,7 +41,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${inter.variable} h-full antialiased`}>
+    <html lang="en" className={`${union.variable} h-full antialiased`}>
       <body className="h-full overflow-hidden">{children}</body>
     </html>
   );

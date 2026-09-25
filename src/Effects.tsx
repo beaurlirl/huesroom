@@ -1,6 +1,6 @@
 "use client";
 
-import { Bloom, EffectComposer, ToneMapping } from "@react-three/postprocessing";
+import { Bloom, EffectComposer, N8AO, ToneMapping } from "@react-three/postprocessing";
 import { ToneMappingMode } from "postprocessing";
 import { BLOOM } from "./config";
 import { useIsTouch } from "./Hud";
@@ -19,6 +19,8 @@ export function Effects() {
   if (touch) return null;
   return (
     <EffectComposer multisampling={4}>
+      {/* Contact shading where things meet (couch/floor, corners, Hue's feet) grounds the room. */}
+      <N8AO aoRadius={0.22} distanceFalloff={0.6} intensity={2.2} quality="medium" halfRes color="#1a120a" />
       <Bloom luminanceThreshold={BLOOM.threshold} luminanceSmoothing={0.1} intensity={BLOOM.intensity} mipmapBlur />
       <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
     </EffectComposer>

@@ -3,12 +3,12 @@
 import { useThree } from "@react-three/fiber";
 import { useEffect, useState } from "react";
 import * as THREE from "three";
-import { CAMERA, HUE } from "./config";
+import { BASE_PATH, CAMERA, HUE } from "./config";
 import { COIN_COUNT, formatTime, runtime, useGame } from "./store";
 import { theme } from "./ui/theme";
 
 // Share card layout (1080×1920, Instagram Story). Restyle here and in ui/theme.ts.
-const CARD = { w: 1080, h: 1920, photoH: 1320, pad: 72 };
+const CARD = { w: 1080, h: 1920, photoH: 1300, pad: 64 };
 
 type Snapshot = (w: number, h: number) => ImageData;
 let snapshot: Snapshot | null = null;
@@ -93,7 +93,11 @@ async function ensureFonts() {
   }
 }
 
-/** Composes the 1080×1920 card on a 2D canvas. */
+/**
+ * Composes the 1080×1920 card on a 2D canvas, after directory.onl: Union, uppercase, a header
+ * with a hairline rule, a square-framed photo, a blue kicker over a huge bold time, and a solid
+ * blue band announcing the hue.onl unlock.
+ */
 export async function renderShareCard(time: number): Promise<Blob | null> {
   if (!snapshot) return null;
   await ensureFonts();
@@ -103,46 +107,64 @@ export async function renderShareCard(time: number): Promise<Blob | null> {
   canvas.height = h;
   const g = canvas.getContext("2d");
   if (!g) return null;
+  const family = getComputedStyle(document.documentElement).getPropertyValue(theme.fontVar).trim() || "Helvetica Neue";
+  const font = (weight: number, size: number) => `${weight} ${size}px ${family}, "Helvetica Neue", Helvetica, Arial, sans-serif`;
+  const up = (t: string) => t.toUpperCase();
 
   g.fillStyle = theme.paper;
   g.fillRect(0, 0, w, h);
+  g.textBaseline = "alphabetic";
 
-  // Photo, with rounded corners inside the margins.
-  const photo = snapshot(w - pad * 2, photoH - pad);
+  // Header: wordmark, hairline, date.
+  const headerY = pad + 56;
+  g.fillStyle = theme.ink;
+  g.font = font(700, 68);
+  g.fillText(up(theme.wordmark), pad, headerY);
+  const wordW = g.measureText(up(theme.wordmark)).width;
+  const date = up(new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }));
+  g.font = font(400, 34);
+  const dateW = g.measureText(date).width;
+  g.fillText(date, w - pad - dateW, headerY);
+  g.fillRect(pad + wordW + 28, headerY - 22, w - pad * 2 - wordW - dateW - 56, 2);
+
+  // Photo: square corners, hairline frame.
+  const photoTop = headerY + 44;
+  const photo = snapshot(w - pad * 2, photoH - photoTop);
   const tmp = document.createElement("canvas");
   tmp.width = photo.width;
   tmp.height = photo.height;
   tmp.getContext("2d")!.putImageData(photo, 0, 0);
-  g.save();
-  g.beginPath();
-  g.roundRect(pad, pad, photo.width, photo.height, 40);
-  g.clip();
-  g.drawImage(tmp, pad, pad);
-  g.restore();
+  g.drawImage(tmp, pad, photoTop);
+  g.lineWidth = 2;
+  g.strokeStyle = theme.ink;
+  g.strokeRect(pad + 1, photoTop + 1, photo.width - 2, photo.height - 2);
 
-  const font = getComputedStyle(document.documentElement).getPropertyValue("--font-inter").trim() || "system-ui";
+  // Kicker + time.
+  const kickerY = photoTop + photo.height + 86;
+  g.fillStyle = theme.blue;
+  g.fillRect(pad, kickerY - 24, 22, 22);
+  g.font = font(700, 34);
+  g.fillText(up(`all ${COIN_COUNT} coins`), pad + 40, kickerY);
   g.fillStyle = theme.ink;
-  g.textBaseline = "alphabetic";
+  g.font = font(700, 250);
+  g.fillText(formatTime(time), pad - 8, kickerY + 230);
 
-  g.font = `500 200px ${font}, system-ui, sans-serif`;
-  g.fillText(formatTime(time), pad, photoH + 230);
-
-  g.fillStyle = theme.muted;
-  g.font = `400 54px ${font}, system-ui, sans-serif`;
-  g.fillText(`${COIN_COUNT} / ${COIN_COUNT} coins`, pad, photoH + 320);
-
-  g.fillStyle = theme.ink;
-  g.font = `500 72px ${font}, system-ui, sans-serif`;
-  g.fillText(theme.wordmark, pad, h - pad - 70);
-  g.fillStyle = theme.muted;
-  g.font = `400 40px ${font}, system-ui, sans-serif`;
-  g.fillText(window.location.host, pad, h - pad);
+  // Blue band: the unlock, and where to play.
+  const bandH = 150;
+  g.fillStyle = theme.blue;
+  g.fillRect(0, h - bandH, w, bandH);
+  g.fillStyle = theme.paper;
+  g.font = font(700, 44);
+  g.fillText(up(`unlocked ${theme.unlockLabel}`), pad, h - bandH / 2 + 16);
+  const link = up(`${window.location.host}${BASE_PATH}`);
+  g.font = font(400, 32);
+  g.fillText(link, w - pad - g.measureText(link).width, h - bandH / 2 + 12);
 
   return new Promise((resolve) => canvas.toBlob((b) => resolve(b), "image/png"));
 }
 
 export function shareCaption(time: number) {
-  return `i got all ${COIN_COUNT} coins in ${formatTime(time)} in ${theme.wordmark} → ${window.location.origin}`;
+  return `i got all ${COIN_COUNT} coins in ${formatTime(time)} in ${theme.wordmark} and unlocked ${theme.unlockLabel} → ${window.location.origin}${BASE_PATH}`;
 }
 
 /** Win-panel Share button: phone share sheet (Instagram et al.), else download + copy caption. */
@@ -220,18 +242,13 @@ export function ShareButton() {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={onShare}
-        className="pointer-events-auto rounded-full px-5 py-2 text-sm transition-transform active:scale-95"
-        style={{ background: "rgba(17,17,17,0.06)", color: theme.ink, opacity: busy ? 0.6 : 1 }}
-      >
-        {busy ? "…" : "Share"}
+      <button type="button" onClick={onShare} className="ui-btn pointer-events-auto text-sm" style={{ opacity: busy ? 0.6 : 1 }}>
+        {busy ? "sharing…" : "share"}
       </button>
       {toast && (
         <div
-          className="fixed left-1/2 -translate-x-1/2 rounded-full px-4 py-2 text-sm"
-          style={{ bottom: "calc(24px + env(safe-area-inset-bottom))", background: theme.ink, color: theme.paper }}
+          className="ui fixed left-1/2 -translate-x-1/2 px-4 py-2.5 text-xs"
+          style={{ bottom: "calc(24px + env(safe-area-inset-bottom))", background: theme.paper, color: theme.blue, animation: "ui-rise 0.3s ease-out" }}
         >
           {toast}
         </div>

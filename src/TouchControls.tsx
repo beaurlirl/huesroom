@@ -38,11 +38,13 @@ export function TouchControls() {
           pointerEvents: visible ? "auto" : "none",
         }}
       >
+        {/* Glass disc behind the stick (the library draws its own base on top). */}
+        <div className="glass pointer-events-none absolute inset-0 rounded-full" />
         <Joystick
           size={116}
           stickSize={52}
-          baseColor="rgba(255,255,255,0.55)"
-          stickColor="rgba(17,17,17,0.75)"
+          baseColor="rgba(0, 71, 255, 0.22)"
+          stickColor="rgba(255, 255, 255, 0.92)"
           throttle={16}
           move={(e) =>
             useTouchInput.setState({ moveX: e.x ?? 0, moveZ: e.y ?? 0, run: (e.distance ?? 0) > RUN_DISTANCE })
@@ -53,18 +55,17 @@ export function TouchControls() {
       <button
         type="button"
         aria-label="Jump"
-        className="absolute flex items-center justify-center rounded-full text-xs"
+        className={`ui absolute flex items-center justify-center text-sm font-bold ${jumpDown ? "" : "glass"}`}
         style={{
           right: "calc(28px + env(safe-area-inset-right))",
           bottom: "calc(44px + env(safe-area-inset-bottom))",
           width: 72,
           height: 72,
-          background: jumpDown ? "rgba(17,17,17,0.8)" : theme.pill,
-          color: jumpDown ? theme.paper : theme.ink,
+          background: jumpDown ? theme.blue : undefined,
+          color: theme.paper,
           transform: jumpDown ? "scale(0.92)" : "scale(1)",
           transition: "transform 0.08s, background 0.08s",
           pointerEvents: visible ? "auto" : "none",
-          fontFamily: theme.font,
         }}
         onPointerDown={(e) => {
           e.currentTarget.setPointerCapture(e.pointerId);

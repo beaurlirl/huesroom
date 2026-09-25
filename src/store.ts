@@ -23,6 +23,26 @@ export function readBest(): number | null {
   }
 }
 
+/**
+ * Finishing the room unlocks the main Hue at hue.onl. Served at hue.onl/huesroom, this is the
+ * same origin as hue.onl, so the main site can read either the localStorage key or the cookie.
+ * (hue.onl itself doesn't check it yet: that's a change on the hue.onl site.)
+ */
+export const UNLOCK_KEY = "hue.unlocked";
+function markUnlocked(time: number) {
+  const value = JSON.stringify({ at: new Date().toISOString(), time });
+  try {
+    window.localStorage.setItem(UNLOCK_KEY, value);
+  } catch {
+    // Storage blocked: the cookie below may still work.
+  }
+  try {
+    document.cookie = `hue_unlocked=1; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
+  } catch {
+    // Cookies blocked: nothing else to do.
+  }
+}
+
 function writeBest(t: number) {
   try {
     window.localStorage.setItem(BEST_KEY, String(t));
@@ -66,6 +86,7 @@ export const useGame = create<GameState>((set, get) => ({
     const prev = readBest();
     const isBest = prev === null || time < prev;
     if (isBest) writeBest(time);
+    markUnlocked(time);
     set({ collected: next, phase: "won", result: { time, best: isBest ? time : prev, isBest } });
   },
   restart: () => {

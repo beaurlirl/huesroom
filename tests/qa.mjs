@@ -63,6 +63,7 @@ check('timer running once playing', s3.elapsed > 0.3 && s3.elapsed < 1.5, `elaps
 {
   await page.waitForTimeout(300);
   const a = await page.evaluate(() => ({ listed: window.__hue.audio.listedClips().sort().join(','), loaded: window.__hue.audio.loadedClips().sort().join(',') }));
+  check('owner track is playing', await page.evaluate(() => window.__hue.audio.musicPlaying()));
   check('every listed audio clip loaded', a.listed === a.loaded, `listed [${a.listed}] loaded [${a.loaded}]${a.listed ? '' : ' (synth sounds only)'}`);
 }
 
