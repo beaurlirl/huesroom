@@ -11,7 +11,8 @@ export type Phase =
   | "resetting"; // fading to white before a restart
 
 export const COIN_COUNT = 11;
-export const RESET_FADE_MS = 450;
+/** Restart: the room fogs over to white glass before it resets behind it. */
+export const RESET_FADE_MS = 650;
 const BEST_KEY = "huesroom.best";
 
 export function readBest(): number | null {
@@ -93,7 +94,7 @@ export const useGame = create<GameState>((set, get) => ({
     const { phase } = get();
     if (phase === "loading" || phase === "resetting") return;
     set({ phase: "resetting", paused: false });
-    // Fade to white, reset everything behind it, then replay the intro.
+    // Fog over to white, reset everything behind it, then replay the intro.
     setTimeout(() => {
       runtime.elapsed = 0;
       set((s) => ({ runId: s.runId + 1, collected: 0, result: null, phase: "intro" }));

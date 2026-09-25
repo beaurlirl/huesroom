@@ -63,6 +63,92 @@ body {
   color: var(--glass-text);
 }
 
+/*
+ * White frosted glass for the intro, outro, pause, restart and exit screens: black Union on
+ * white. Blur and whiteness are registered custom properties so they ease together, which reads
+ * as the room fogging over / clearing rather than a flat fade. Driven by src/ui/Frost.tsx.
+ */
+@property --frost-blur {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@property --frost-veil {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+.frost {
+  background: rgb(255 255 255 / var(--frost-veil));
+  -webkit-backdrop-filter: blur(var(--frost-blur)) saturate(120%);
+  backdrop-filter: blur(var(--frost-blur)) saturate(120%);
+  color: var(--ink);
+  transition:
+    --frost-blur var(--frost-ms, 900ms) var(--glass-ease),
+    --frost-veil var(--frost-ms, 900ms) var(--glass-ease);
+}
+:root {
+  --glass-ease: cubic-bezier(0.65, 0, 0.25, 1);
+}
+
+/* Small white-glass chip over the live room (begin prompt). */
+.frost-chip {
+  background: rgb(255 255 255 / 0.78);
+  -webkit-backdrop-filter: blur(14px) saturate(120%);
+  backdrop-filter: blur(14px) saturate(120%);
+  color: var(--ink);
+  border: 1px solid rgb(10 10 10 / 0.12);
+}
+
+/* Text that condenses out of the glass / dissolves back into it. */
+@keyframes glass-in {
+  from {
+    opacity: 0;
+    filter: blur(14px);
+    transform: translateY(10px) scale(1.02);
+    letter-spacing: 0.06em;
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: none;
+  }
+}
+@keyframes glass-out {
+  from {
+    opacity: 1;
+    filter: blur(0);
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    filter: blur(16px);
+    transform: translateY(-8px) scale(0.99);
+    letter-spacing: 0.05em;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .frost {
+    transition-duration: 0.2s;
+  }
+  @keyframes glass-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes glass-out {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+}
+
 /* Small category label (directory's red/orange/blue kickers). */
 .ui-label {
   font-size: 10px;

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useIsTouch } from "../Hud";
 import { INTRO } from "../config";
 import { RESET_FADE_MS, useGame } from "../store";
+import { Frost, GLASS } from "./Frost";
 import { theme } from "./theme";
 
 /** Loading screen → fade from white with the title → `begin` prompt. */
@@ -64,34 +65,35 @@ export function Overlay() {
   }, [phase, setPhase]);
 
   const loading = phase === "loading";
-  const card = phase === "intro" && stage === "card" && runId === 0;
   const white = loading || phase === "resetting" || (phase === "intro" && stage === "card");
+  const leavingCard = phase === "intro" && stage === "reveal";
 
   const prompt = touch ? "tap to begin" : pad ? "press A to begin" : "press any key";
 
   return (
     <div className="ui pointer-events-none fixed inset-0 select-none" style={{ color: theme.ink }}>
-      {/* White layer: loading screen, then fades away to reveal the start shot. */}
-      <div
+      {/* White glass: loading screen and title card, then it clears to reveal the start shot.
+          A restart fogs back over to white before the room resets behind it. */}
+      <Frost
+        level={white ? "white" : "clear"}
+        ms={phase === "resetting" ? RESET_FADE_MS : INTRO.fadeFromWhite * 1000}
         className="absolute inset-0 flex flex-col items-center justify-center"
-        style={{
-          background: theme.paper,
-          opacity: white ? 1 : 0,
-          transition: `opacity ${phase === "resetting" ? RESET_FADE_MS / 1000 : INTRO.fadeFromWhite}s ease-in-out`,
-        }}
       >
-        {/* Title card: fades in on white, then leaves with the white layer. */}
-        {(card || (phase === "intro" && runId === 0)) && (
+        {/* Title card: condenses out of the white, then dissolves as the glass clears. */}
+        {phase === "intro" && runId === 0 && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 px-6 text-center">
             <h1
               className="text-5xl font-bold leading-[0.9] sm:text-7xl md:text-8xl"
-              style={{ animation: `ui-fade ${INTRO.titleIn}s ease-out both` }}
+              style={{ animation: leavingCard ? GLASS.out(INTRO.titleOut) : GLASS.in(INTRO.titleIn) }}
             >
               {theme.wordmark}
             </h1>
             <div
               className="flex items-center gap-3 text-sm sm:text-base"
-              style={{ color: theme.muted, animation: `ui-fade ${INTRO.creditIn}s ease-out ${INTRO.creditDelay}s both` }}
+              style={{
+                color: theme.muted,
+                animation: leavingCard ? GLASS.out(INTRO.titleOut, 0.08) : GLASS.in(INTRO.creditIn, INTRO.creditDelay),
+              }}
             >
               <span className="ui-rule hidden w-10 sm:block" />
               <span>{INTRO.credit}</span>
@@ -99,7 +101,10 @@ export function Overlay() {
             </div>
           </div>
         )}
-        <div className="flex w-64 flex-col gap-3" style={{ opacity: loading ? 1 : 0, transition: "opacity 0.3s" }}>
+        <div
+          className="flex w-64 flex-col gap-3"
+          style={{ animation: loading ? GLASS.in(0.6) : GLASS.out(0.5), visibility: loading || (phase === "intro" && runId === 0) ? "visible" : "hidden" }}
+        >
           <span className="text-3xl font-bold leading-none">{theme.loadingMark}</span>
           <div className="relative h-px w-full" style={{ background: "rgba(10,10,10,0.15)" }}>
             <div className="absolute inset-y-0 left-0" style={{ width: `${progress}%`, background: theme.ink, transition: "width 0.2s" }} />
@@ -109,19 +114,15 @@ export function Overlay() {
             <span className="tabular-nums">{String(Math.round(progress)).padStart(3, "0")}%</span>
           </div>
         </div>
-      </div>
+      </Frost>
 
-      <div
-        className="absolute inset-x-0 flex justify-center"
-        style={{
-          bottom: "calc(12vh + env(safe-area-inset-bottom))",
-          opacity: phase === "ready" ? 1 : 0,
-          transition: "opacity 0.6s ease-in-out",
-        }}
-      >
-        <span className="glass px-5 py-3 text-sm" style={{ animation: phase === "ready" ? "ui-rise 0.6s ease-out" : undefined }}>
-          ({prompt})
-        </span>
+      {/* Begin prompt: a small white-glass chip that condenses in and dissolves on begin. */}
+      <div className="absolute inset-x-0 flex justify-center" style={{ bottom: "calc(12vh + env(safe-area-inset-bottom))" }}>
+        {(phase === "ready" || phase === "rising") && (
+          <span key={runId} className="frost-chip px-5 py-3 text-sm" style={{ animation: phase === "ready" ? GLASS.in(0.7) : GLASS.out(0.45) }}>
+            ({prompt})
+          </span>
+        )}
       </div>
     </div>
   );

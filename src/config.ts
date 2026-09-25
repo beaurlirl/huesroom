@@ -233,9 +233,21 @@ export const INTRO = {
   titleIn: 1.1,
   creditDelay: 0.9,
   creditIn: 1.0,
+  /** Title and credit dissolving into the glass as it clears. */
+  titleOut: 0.9,
   /** Seconds from the start of the intro until the card begins to fade out. */
   cardHold: 3.8,
-  /** White card → the room. */
+  /** White glass clearing to the room. */
   fadeFromWhite: 1.8,
   credit: "A game developed by Gest in Lower Manhattan",
+};
+
+/** Win: title on the fogged glass, then the results (seconds). */
+export const OUTRO = {
+  /** How long "hue leaves home" holds before the results settle in. */
+  titleHold: 3.0,
+  /** Title dissolving before the results. */
+  titleOut: 0.6,
+  /** Gap between each results row condensing in. */
+  stagger: 0.18,
 };
