@@ -1,5 +1,22 @@
 # Deploying to hue.onl/huesroom
 
+## Simplest: a static folder inside hue.onl (no separate Vercel project)
+
+The game is fully client-side, so it exports to plain static files:
+
+```bash
+npm run export:hue                     # -> out/, built for the /huesroom path
+rm -rf ~/Desktop/hue.onl/huesroom && cp -R out ~/Desktop/hue.onl/huesroom
+cd ~/Desktop/hue.onl && git checkout -b huesroom && git add huesroom && git commit -m "Add Hue's Room at /huesroom"
+git push -u origin huesroom            # Vercel builds a preview for the branch
+```
+
+Try the preview, then merge `huesroom` into `main` to put it live at hue.onl/huesroom.
+Tested: the export served as a `/huesroom` folder from a plain static server passes QA 25/25
+and the gamepad checks. (~24 MB, mostly the room model and the music.)
+
+## Alternative: its own Vercel project + a rewrite
+
 Nothing here has been run yet — it needs your go-ahead (prompt milestone 8: preview only; don't
 touch hue.onl's project or production until you say so).
 

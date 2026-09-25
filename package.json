@@ -9,7 +9,8 @@
     "lint": "eslint",
     "test:routes": "node tests/routes.mjs",
     "test:qa": "node tests/qa.mjs",
-    "test:gamepad": "node tests/gamepad.mjs"
+    "test:gamepad": "node tests/gamepad.mjs",
+    "export:hue": "rm -rf out && STATIC_EXPORT=1 NEXT_PUBLIC_BASE_PATH=/huesroom NEXT_PUBLIC_SITE_URL=https://hue.onl next build"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.8",
