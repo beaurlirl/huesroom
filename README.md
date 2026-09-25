@@ -21,7 +21,8 @@ console table of surfaces) · `?test` (scripted-test hooks on `window.__hue`, no
 
 WASD / arrows move (camera-relative), Shift runs, Space jumps, R restarts, Esc / P pause, mouse
 drag peeks. On touch devices: joystick (push past 70% to run), jump button, drag the right half
-to peek, pause button.
+to peek, pause button. Xbox/standard gamepad: left stick moves (past 70% or RB/RT = run), A jumps
+and confirms menus, right stick peeks, Menu pauses, View restarts.
 
 ## Tests
 
@@ -30,9 +31,9 @@ in `~/Library/Caches/ms-playwright`.
 
 ```bash
 npm run test:routes    # every route in prompt 1.5, via teleport + scripted input (18 legs)
-npm run test:qa        # 23 end-to-end checks: intro lock, timer, keyboard play, pause, restart,
+npm run test:qa        # 24 end-to-end checks: intro lock, timer, keyboard play, pause, restart,
                        # win + best time, pose monitor, audio, touch UI, console errors
-URL="http://localhost:3200/room/?test" npm run test:qa   # against a sub-path build
+URL="http://localhost:3200/huesroom/?test" npm run test:qa   # against a sub-path build
 ```
 
 ## Where things are

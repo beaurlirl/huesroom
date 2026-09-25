@@ -1,7 +1,7 @@
 // Tunables from CURSOR_GAME_DEV_BUILD_PROMPT.md. Units: metres, seconds.
 
 /**
- * The game may be served under a sub-path of hue.onl (e.g. /room). Set NEXT_PUBLIC_BASE_PATH
+ * The game may be served under a sub-path of hue.onl (e.g. /huesroom). Set NEXT_PUBLIC_BASE_PATH
  * at build time (next.config.ts uses it as `basePath`) and every asset URL follows.
  */
 export const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
@@ -158,6 +158,17 @@ export const BOOKS = {
   thudSpeed: 1,
 };
 
+/** Pushable spray cans, cut out of ROOM_static at load (user request). */
+export const CANS = {
+  massKg: 0.3,
+  friction: 0.5,
+  restitution: 0.15,
+  /** Materials that make up a can (body, nozzle, cap); triangles inside a can's COL box. */
+  materials: ["Spray can | gloss black", "Spray can | red", "Spray can | blue", "Brushed aluminum", "Coin gold"],
+  /** Floor hits play the thud higher, like a metal clink. */
+  clinkPitch: 1.7,
+};
+
 export const BLOOM = { threshold: 2.2, intensity: 0.8 };
 
 export const CAMERA = {
@@ -196,6 +207,12 @@ export const CAMERA = {
   cornerMirror: 1,
   cornerCamY: 2.1,
   cornerBlend: 0.6,
+  /** Ladder zone (right-wall shelf front, ladder, door shelf): camera rises to ladderCamY. */
+  ladderMinX: 0.7,
+  ladderMinZ: -0.3,
+  ladderMinY: 1.3,
+  /** Just under the 2.6 m ceiling, so it sees over the door shelf. */
+  ladderCamY: 2.56,
   portraitMinHFov: 55,
   portraitMaxVFov: 70,
 };

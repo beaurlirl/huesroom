@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test:routes": "node tests/routes.mjs",
-    "test:qa": "node tests/qa.mjs"
+    "test:qa": "node tests/qa.mjs",
+    "test:gamepad": "node tests/gamepad.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.8",

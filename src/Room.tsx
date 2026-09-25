@@ -6,6 +6,7 @@ import { ConvexHullCollider, CuboidCollider, RigidBody } from "@react-three/rapi
 import { useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { ASSETS } from "./config";
+import { DYNAMIC_PROP_PREFIXES } from "./pushables";
 import { runtime } from "./store";
 
 export type BoxCollider = {
@@ -148,6 +149,7 @@ export function Room() {
         )}
         {colliders
           .filter((c) => !(hull && c.name === BEANBAG_COLLIDER))
+          .filter((c) => !DYNAMIC_PROP_PREFIXES.some((p) => c.name.startsWith(p)))
           .map((c) => (
           <CuboidCollider
             key={c.name}

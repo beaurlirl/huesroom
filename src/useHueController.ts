@@ -5,9 +5,9 @@ import * as THREE from "three";
 import type { Animator } from "./animator";
 import { playSfx } from "./audio/sfx";
 import { sampleCurve, type RootCurve } from "./clips";
-import { bookBodies } from "./Books";
 import { BOOKS, CLIMB, CLIP_TIMES, FLAGS, HUE, LANDING, MOVE } from "./config";
 import type { InputSample } from "./input";
+import { pushableBodies } from "./pushables";
 import { beanbag, colliderMeta, roomColliders, type BoxCollider } from "./Room";
 import { runtime } from "./store";
 
@@ -87,6 +87,11 @@ class HueMover {
   private peakY = 0;
   private landing: Landing | null = null;
   private climb: Climb | null = null;
+
+  /** Top of the ledge being climbed (world y), or null when not climbing. */
+  get climbTop() {
+    return this.climb ? this.climb.top : null;
+  }
   private pushTimer = 0;
   private ladderMove: LadderMove | null = null;
   private speedSmoothed = 0;
@@ -295,7 +300,7 @@ class HueMover {
       this.cc.enableAutostep(MOVE.autostepMax, MOVE.autostepMinWidth, !running);
     }
     const m = this.move(desired, false);
-    this.pushBooks();
+    this.pushProps();
     const wasGrounded = this.grounded;
     this.grounded = this.cc.computedGrounded() && this.vel.y <= 0;
     if (this.grounded) {
@@ -322,17 +327,17 @@ class HueMover {
   }
 
   /**
-   * The controller is kinematic, so books don't get pushed by it: on each contact, shove the
-   * book along Hue's horizontal velocity (gentle walking, a kick with a little lift running).
+   * The controller is kinematic, so props (books, spray cans) don't get pushed by it: on each
+   * contact, shove the prop along Hue's horizontal velocity (gentle walking, a kick with a little lift running).
    */
-  private pushBooks() {
+  private pushProps() {
     const speed = Math.hypot(this.vel.x, this.vel.z);
     if (speed < 0.05) return;
     const running = speed > (MOVE.walkSpeed + MOVE.runSpeed) / 2;
     const impulse = running ? BOOKS.runImpulse : BOOKS.walkImpulse;
     for (let i = 0; i < this.cc.numComputedCollisions(); i++) {
       const body = this.cc.computedCollision(i)?.collider?.parent();
-      if (!body || !bookBodies.has(body)) continue;
+      if (!body || !pushableBodies.has(body)) continue;
       const last = this.lastKick.get(body.handle) ?? -Infinity;
       if (this.now - last < BOOKS.cooldown) continue;
       this.lastKick.set(body.handle, this.now);

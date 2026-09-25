@@ -60,6 +60,14 @@ export function Hue() {
     return out;
   }, [mixer, clips]);
   const anim = useMemo(() => new Animator(mixer, actions, "sit"), [mixer, actions]);
+  const toes = useMemo(
+    () =>
+      ["mixamorigLeftToeBase", "mixamorigRightToeBase"]
+        .map((n) => gltf.scene.getObjectByName(n))
+        .filter((o): o is THREE.Object3D => !!o),
+    [gltf.scene],
+  );
+  const toeTmp = useMemo(() => new THREE.Vector3(), []);
 
   const seatedFeet = useMemo(
     () => seatedRootOffset.clone().applyAxisAngle(UP, spawn.yaw).add(spawn.feet),
@@ -152,6 +160,17 @@ export function Hue() {
       root.rotation.set(0, mover.yaw, 0);
     }
     anim.update(dt);
+
+    // Foot planting on ledge climbs: the climb loop lifts his feet up to ~15 cm above the
+    // root mid-cycle, so near the top they floated over the cushion. Keep the lowest foot at
+    // or below the ledge top by lowering the model (the capsule is unaffected).
+    const top = mover?.climbTop ?? null;
+    if (top !== null) {
+      root.updateMatrixWorld(true);
+      let lowest = Infinity;
+      for (const toe of toes) lowest = Math.min(lowest, toe.getWorldPosition(toeTmp).y);
+      if (lowest > top) root.position.y -= lowest - top;
+    }
   });
 
   return (

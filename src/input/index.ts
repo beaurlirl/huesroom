@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { pollGamepad } from "./gamepad";
 
 /** One merged input sample. moveZ +1 = away from the camera, moveX +1 = right on screen. */
 export type InputSample = { moveX: number; moveZ: number; run: boolean; jump: boolean };
@@ -32,8 +33,9 @@ const any = (...codes: string[]) => codes.some((c) => down.has(c));
 export function readInput(): InputSample {
   listen();
   const touch = useTouchInput.getState();
-  let moveX = (any("KeyD", "ArrowRight") ? 1 : 0) - (any("KeyA", "ArrowLeft") ? 1 : 0) + touch.moveX;
-  let moveZ = (any("KeyW", "ArrowUp") ? 1 : 0) - (any("KeyS", "ArrowDown") ? 1 : 0) + touch.moveZ;
+  const pad = pollGamepad();
+  let moveX = (any("KeyD", "ArrowRight") ? 1 : 0) - (any("KeyA", "ArrowLeft") ? 1 : 0) + touch.moveX + pad.moveX;
+  let moveZ = (any("KeyW", "ArrowUp") ? 1 : 0) - (any("KeyS", "ArrowDown") ? 1 : 0) + touch.moveZ + pad.moveZ;
   const len = Math.hypot(moveX, moveZ);
   if (len > 1) {
     moveX /= len;
@@ -42,8 +44,8 @@ export function readInput(): InputSample {
   return {
     moveX,
     moveZ,
-    run: any("ShiftLeft", "ShiftRight") || touch.run,
-    jump: down.has("Space") || touch.jump,
+    run: any("ShiftLeft", "ShiftRight") || touch.run || pad.run,
+    jump: down.has("Space") || touch.jump || pad.jump,
   };
 }
 

@@ -14,6 +14,19 @@ export function Overlay() {
   const { progress } = useProgress();
   const touch = useIsTouch();
   const [titleOut, setTitleOut] = useState(false);
+  const [pad, setPad] = useState(false);
+  useEffect(() => {
+    // Browsers only report a pad after its first button press, so poll as well as listen.
+    const check = () => setPad(Array.from(navigator.getGamepads?.() ?? []).some((g) => g?.connected));
+    const timer = setInterval(check, 500);
+    window.addEventListener("gamepadconnected", check);
+    window.addEventListener("gamepaddisconnected", check);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("gamepadconnected", check);
+      window.removeEventListener("gamepaddisconnected", check);
+    };
+  }, []);
   const titleVisible = phase === "intro" && !titleOut;
 
   // Intro timeline.
@@ -92,7 +105,7 @@ export function Overlay() {
         }}
       >
         <span className="rounded-full px-5 py-2 text-sm" style={{ background: theme.pill }}>
-          {touch ? "tap to begin" : "press any key"}
+          {touch ? "tap to begin" : pad ? "press A to begin" : "press any key"}
         </span>
       </div>
     </div>

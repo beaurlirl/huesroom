@@ -9,10 +9,12 @@ import { AssetGate } from "./AssetGate";
 import { AudioDirector } from "./audio/AudioDirector";
 import { loadedClips } from "./audio/sfx";
 import { bookBodies, Books } from "./Books";
+import { pushableBodies } from "./pushables";
 import { CameraRig } from "./CameraRig";
 import { Coins } from "./Coins";
 import { Hud, useIsTouch } from "./Hud";
 import { useTouchInput } from "./input";
+import { GamepadDirector } from "./input/GamepadDirector";
 import { useHotkeys } from "./input/hotkeys";
 import { DebugView } from "./DebugView";
 import { Effects } from "./Effects";
@@ -21,6 +23,7 @@ import { Hue } from "./Hue";
 import { Lighting } from "./Lighting";
 import { Room, roomColliders } from "./Room";
 import { ShareButton, ShareSnapshot } from "./ShareCard";
+import { SprayCans } from "./SprayCans";
 import { TouchControls } from "./TouchControls";
 import { runtime, useGame } from "./store";
 import { Overlay } from "./ui/Overlay";
@@ -113,6 +116,7 @@ export default function Game() {
           runtime,
           colliders: roomColliders,
           books: bookBodies,
+          pushables: pushableBodies,
           touch: useTouchInput,
           audio: { loadedClips },
         },
@@ -164,6 +168,7 @@ export default function Game() {
               <Hue />
               <Coins />
               <Books />
+              <SprayCans />
             <ExposeWorld />
               <CameraRig />
               {debug && <DebugView />}
@@ -177,6 +182,7 @@ export default function Game() {
         {debug && <Stats />}
       </Canvas>
       <AudioDirector />
+      <GamepadDirector />
       <TouchControls />
       <Hud share={<ShareButton />} />
       <Overlay />

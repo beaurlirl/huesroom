@@ -4,7 +4,7 @@ import "./globals.css";
 
 const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
 
-// Absolute URLs for link previews. The game is expected at hue.onl/room (NEXT_PUBLIC_BASE_PATH).
+// Absolute URLs for link previews. The game is expected at hue.onl/huesroom (NEXT_PUBLIC_BASE_PATH).
 const site = process.env.NEXT_PUBLIC_SITE_URL ?? "https://hue.onl";
 const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 const description = "Help Hue collect all 11 coins, as fast as you can.";

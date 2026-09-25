@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { playSfx } from "./audio/sfx";
 import { ASSETS, BOOKS } from "./config";
+import { pushableBodies } from "./pushables";
 import { blenderName, colliderMeta } from "./Room";
 import { useGame } from "./store";
 
@@ -21,7 +22,7 @@ type Book = {
   restitution: number;
 };
 
-/** Every live book body, for the character controller's kick impulses. */
+/** The two book bodies (also registered as pushables for the controller's kick impulses). */
 export const bookBodies = new Set<RapierRigidBody>();
 
 // The book nodes are moved out of the room scene once; cache per scene so a second
@@ -104,9 +105,15 @@ export function Books() {
           key={b.name}
           ref={(body) => {
             const prev = bodies.current[i];
-            if (prev) bookBodies.delete(prev);
+            if (prev) {
+              bookBodies.delete(prev);
+              pushableBodies.delete(prev);
+            }
             bodies.current[i] = body;
-            if (body) bookBodies.add(body);
+            if (body) {
+              bookBodies.add(body);
+              pushableBodies.add(body);
+            }
           }}
           type="dynamic"
           colliders={false}

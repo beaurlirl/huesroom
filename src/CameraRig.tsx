@@ -5,6 +5,7 @@ import { useRapier, type RapierCollider } from "@react-three/rapier";
 import { useEffect, useLayoutEffect, useRef } from "react";
 import * as THREE from "three";
 import { CAMERA as C, FLAGS } from "./config";
+import { pollGamepad } from "./input/gamepad";
 import { runtime, useGame } from "./store";
 
 /** Critically damped spring (Unity-style SmoothDamp). Mutates `state.v`. */
@@ -82,6 +83,9 @@ export function CameraRig() {
     unblock: new THREE.Vector2(),
     cornerW: 0,
     vcw: { v: 0 },
+    ladderW: 0,
+    vlw: { v: 0 },
+    yMaxNow: C.yMax as number,
     vux: { v: 0 },
     vuy: { v: 0 },
     initialised: false,
@@ -117,9 +121,19 @@ export function CameraRig() {
       x = THREE.MathUtils.lerp(x, clamp(-feet.x * C.cornerMirror, -C.xClamp, C.xClamp), w);
       y = THREE.MathUtils.lerp(y, Math.max(y, C.cornerCamY), w);
     }
+    // Ladder / door shelf: the door shelf sits between the camera and the ladder, so rise
+    // almost to the ceiling to look over it (user request).
+    const lw = st.ladderW;
+    const yMax = THREE.MathUtils.lerp(C.yMax, C.ladderCamY, lw);
+    if (lw > 0.001) {
+      // Also from the top-left, like the beanbag corner (user request).
+      x = THREE.MathUtils.lerp(x, clamp(-feet.x * C.cornerMirror, -C.xClamp, C.xClamp), lw);
+      y = THREE.MathUtils.lerp(y, Math.max(y, C.ladderCamY), lw);
+    }
+    st.yMaxNow = yMax;
     return {
       x,
-      y: clamp(y, C.yMin, C.yMax),
+      y: clamp(y, C.yMin, yMax),
       look: new THREE.Vector3(feet.x, feet.y + C.chestHeight, feet.z),
       d,
     };
@@ -163,7 +177,7 @@ export function CameraRig() {
     if (isClear(x, y, z, target)) return [0, 0];
     for (const [side, up] of UNBLOCK_CANDIDATES) {
       const cx = clamp(x + side, -C.xClamp, C.xClamp);
-      const cy = clamp(y + up, C.yMin, C.yMax);
+      const cy = clamp(y + up, C.yMin, s.current.yMaxNow);
       if (isClear(cx, cy, z, target)) return [side, up];
     }
     return [0, 0];
@@ -189,6 +203,8 @@ export function CameraRig() {
     const f = runtime.feet;
     const inCorner = f.x > C.cornerMinX && f.z < C.cornerMaxZ;
     st.cornerW = clamp(smoothDamp(st.cornerW, inCorner ? 1 : 0, st.vcw, C.cornerBlend, dt), 0, 1);
+    const nearLadder = f.x > C.ladderMinX && f.z > C.ladderMinZ && f.y > C.ladderMinY;
+    st.ladderW = clamp(smoothDamp(st.ladderW, nearLadder ? 1 : 0, st.vlw, C.cornerBlend, dt), 0, 1);
     const t = targets(st);
     st.x = smoothDamp(st.x, t.x, st.vx, C.smoothX, dt);
     st.y = smoothDamp(st.y, t.y, st.vy, C.smoothY, dt);
@@ -204,7 +220,7 @@ export function CameraRig() {
     st.unblock.x = smoothDamp(st.unblock.x, want[0], st.vux, C.unblockSmooth, dt);
     st.unblock.y = smoothDamp(st.unblock.y, want[1], st.vuy, C.unblockSmooth, dt);
     const camX = clamp(st.x + st.unblock.x, -C.xClamp, C.xClamp);
-    const camY = clamp(st.y + st.unblock.y, C.yMin, C.yMax);
+    const camY = clamp(st.y + st.unblock.y, C.yMin, st.yMaxNow);
     camera.position.set(camX, camY, z);
     runtime.cameraPos.copy(camera.position);
 
@@ -217,8 +233,10 @@ export function CameraRig() {
 
     const p = peek.current;
     if (!p.dragging) {
-      p.yaw = smoothDamp(p.yaw, 0, p.vy, C.peekReturn, dt);
-      p.pitch = smoothDamp(p.pitch, 0, p.vp, C.peekReturn, dt);
+      // Right stick peeks too (held = look, released = spring back).
+      const pad = pollGamepad();
+      p.yaw = smoothDamp(p.yaw, -pad.lookX * C.peekYaw, p.vy, pad.lookX ? 0.12 : C.peekReturn, dt);
+      p.pitch = smoothDamp(p.pitch, -pad.lookY * C.peekPitch, p.vp, pad.lookY ? 0.12 : C.peekReturn, dt);
     }
     euler.current.set(pitch + p.pitch, yaw + p.yaw, 0);
     camera.quaternion.setFromEuler(euler.current);
