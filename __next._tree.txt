@@ -1,0 +1,4 @@
+:HL["/huesroom/_next/static/chunks/3ue-fmyh7i6uc.css","style"]
+:HL["/huesroom/_next/static/media/Union_Bold-s.p.3_n52xgq0yk76.otf","font",{"crossOrigin":"","type":"font/otf"}]
+:HL["/huesroom/_next/static/media/Union_Regular-s.p.3iz6d04fxmxh4.otf","font",{"crossOrigin":"","type":"font/otf"}]
+0:{"tree":{"name":"","param":null,"prefetchHints":4176,"slots":{"children":{"name":"__PAGE__","param":null,"prefetchHints":4256,"slots":null}}},"staleTime":300,"buildId":"V_G-3W8fFospB0Ek2vC-w"}
