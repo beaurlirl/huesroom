@@ -2,6 +2,7 @@
 
 import { useProgress } from "@react-three/drei";
 import { useEffect, useState } from "react";
+import { trackPlayStart } from "../analytics";
 import { useIsTouch } from "../Hud";
 import { INTRO } from "../config";
 import { RESET_FADE_MS, useGame } from "../store";
@@ -54,6 +55,7 @@ export function Overlay() {
     if (phase !== "ready") return;
     const begin = (e: Event) => {
       if (e instanceof KeyboardEvent && (e.repeat || e.metaKey || e.ctrlKey)) return;
+      trackPlayStart();
       setPhase("rising");
     };
     window.addEventListener("keydown", begin);
