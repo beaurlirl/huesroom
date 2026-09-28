@@ -5,6 +5,7 @@ import { useRapier, type RapierCollider } from "@react-three/rapier";
 import { useEffect, useLayoutEffect, useRef } from "react";
 import * as THREE from "three";
 import { CAMERA as C, FLAGS } from "./config";
+import { useIsTouch } from "./Hud";
 import { pollGamepad } from "./input/gamepad";
 import { runtime, useGame } from "./store";
 
@@ -79,6 +80,7 @@ export function CameraRig() {
   const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera;
   const { world, rapier } = useRapier();
   const peek = usePeek();
+  const coarse = useIsTouch();
   const s = useRef({
     unblock: new THREE.Vector2(),
     cornerW: 0,
@@ -126,8 +128,17 @@ export function CameraRig() {
     const lw = st.ladderW;
     const yMax = THREE.MathUtils.lerp(C.yMax, C.ladderCamY, lw);
     if (lw > 0.001) {
-      // Also from the top-left, like the beanbag corner (user request).
-      x = THREE.MathUtils.lerp(x, clamp(-feet.x * C.cornerMirror, -C.xClamp, C.xClamp), lw);
+      // Also from the top-left, like the beanbag corner (user request). On narrow portrait
+      // screens the far corner needs more turn than the yaw clamp allows and Hue left the frame
+      // at the top of the ladder, so there the camera only goes far enough left to face him
+      // within ladderPortraitYaw.
+      let cornerX = clamp(-feet.x * C.cornerMirror, -C.xClamp, C.xClamp);
+      const limit = camera.aspect < 1 ? C.ladderPortraitYaw : coarse ? C.ladderPhoneYaw : null;
+      if (limit !== null) {
+        const depth = Math.max(0.05, runtime.openWallZ + C.planeOffset - feet.z);
+        cornerX = Math.max(cornerX, feet.x - depth * Math.tan(limit));
+      }
+      x = THREE.MathUtils.lerp(x, clamp(cornerX, -C.xClamp, C.xClamp), lw);
       y = THREE.MathUtils.lerp(y, Math.max(y, C.ladderCamY), lw);
     }
     st.yMaxNow = yMax;

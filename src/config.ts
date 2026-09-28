@@ -220,6 +220,10 @@ export const CAMERA = {
   ladderMinY: 1.3,
   /** Just under the 2.6 m ceiling, so it sees over the door shelf. */
   ladderCamY: 2.56,
+  /** Portrait screens: the most the camera turns to face Hue in the ladder zone (≈ 30°). */
+  ladderPortraitYaw: (30 * Math.PI) / 180,
+  /** Phones held landscape: a gentler limit (desktop keeps the full corner view). */
+  ladderPhoneYaw: (40 * Math.PI) / 180,
   portraitMinHFov: 55,
   portraitMaxVFov: 70,
 };
