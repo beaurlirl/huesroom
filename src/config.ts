@@ -1,10 +1,10 @@
 // Tunables from CURSOR_GAME_DEV_BUILD_PROMPT.md. Units: metres, seconds.
 
 /**
- * The game may be served under a sub-path of hue.onl (e.g. /huesroom). Set NEXT_PUBLIC_BASE_PATH
- * at build time (next.config.ts uses it as `basePath`) and every asset URL follows.
+ * The game is served under /huesroom so it works at both huesroom.vercel.app/huesroom/
+ * and hue.onl/huesroom/ (via Vercel rewrite). Override with NEXT_PUBLIC_BASE_PATH="" for dev.
  */
-export const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+export const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "/huesroom";
 export const asset = (path: string) => `${BASE_PATH}${path}`;
 
 export const ASSETS = {

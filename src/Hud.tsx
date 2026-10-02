@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { trackHueClick } from "./analytics";
 import { useAudioSettings } from "./audio/sfx";
 import { OUTRO } from "./config";
 import { COIN_COUNT, formatTime, runtime, useGame } from "./store";
@@ -113,6 +114,10 @@ function Veil({ open, ms, right, children }: { open: boolean; ms: number; right:
 
 /** The unlock pop-up: finishing the room opens the main Hue at hue.onl (owner's request). */
 function UnlockCard({ delay }: { delay: number }) {
+  const handleUnlockClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    trackHueClick();
+    exitTo(e);
+  };
   return (
     <div className="flex w-full flex-col gap-4 p-5 sm:p-6" style={{ background: theme.paper, color: theme.ink, border: `1px solid ${theme.ink}`, animation: GLASS.in(0.9, delay) }}>
       <div className="ui-label flex items-center gap-2" style={{ opacity: 1 }}>
@@ -124,7 +129,7 @@ function UnlockCard({ delay }: { delay: number }) {
         You found all {COIN_COUNT} coins. The main Hue is open to you now.
       </p>
       {/* Leaves through the exit animation (fog to white, then go). */}
-      <a href={theme.unlockUrl} onClick={exitTo} className="ui-cta self-start text-sm" style={{ background: theme.ink, color: theme.paper, borderColor: theme.ink }}>
+      <a href={theme.unlockUrl} onClick={handleUnlockClick} className="ui-cta self-start text-sm" style={{ background: theme.ink, color: theme.paper, borderColor: theme.ink }}>
         enter {theme.unlockLabel} →
       </a>
     </div>
