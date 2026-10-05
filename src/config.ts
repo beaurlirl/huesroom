@@ -93,6 +93,11 @@ export const CLIMB = {
   probeAhead: 0.1,
   pushTime: 0.15,
   riseSpeed: 0.28,
+  /** Hands above the feet at the top of the climb loop (measured 0.27–0.33 m). The climb
+   *  stops once the hands reach the lip; a mantle covers the rest. */
+  handReach: 0.3,
+  /** Hop from hands-on-the-lip up onto the ledge (s). */
+  mantleTime: 0.25,
   overDistance: 0.1,
   overPastLip: 0.05,
   overTime: 0.15,

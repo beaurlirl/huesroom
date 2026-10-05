@@ -14,7 +14,7 @@ import { runtime } from "./store";
 type Rapier = ReturnType<typeof useRapier>["rapier"];
 type Mode = "ground" | "air" | "land" | "climb" | "ladder";
 type Landing = { kind: "hop" | "roll" | "soft"; t: number; lock: number; rollPrev: number };
-type Climb = { phase: "up" | "over"; top: number; startY: number; dirX: number; dirZ: number; t: number; over: number };
+type Climb = { phase: "up" | "mantle" | "over"; top: number; startY: number; dirX: number; dirZ: number; t: number; over: number; from: number };
 type LadderMove = { kind: "enterTop" | "exitTop" | "exitBottom"; from: THREE.Vector3; to: THREE.Vector3; t: number; time: number };
 
 const R = HUE.capsuleRadius;
@@ -466,11 +466,23 @@ class HueMover {
     // Step far enough to put the capsule centre a few cm past the lip, however far away the
     // face was when the climb started (the probe reaches 0.1 m beyond the capsule).
     const over = Math.max(CLIMB.overDistance, faceDist + CLIMB.overPastLip);
-    this.climb = { phase: "up", top, startY: this.feet.y, dirX, dirZ, t: 0, over };
+    this.climb = { phase: "up", top, startY: this.feet.y, dirX, dirZ, t: 0, over, from: 0 };
     this.vel.set(0, 0, 0);
     this.yaw = yawFor(dirX, dirZ);
     this.pushTimer = 0;
-    this.anim.play("climb_ladder", { timeScale: CLIMB.riseSpeed / this.climbRiseSpeed, fade: 0.1 });
+    // Low ledges are already within reach: straight to the mantle.
+    if (top - this.feet.y <= CLIMB.handReach) this.startMantle();
+    else this.anim.play("climb_ladder", { timeScale: CLIMB.riseSpeed / this.climbRiseSpeed, fade: 0.1 });
+  }
+
+  /** Hands are on the lip: hop the rest of the way up (the jump's take-off into its tuck). */
+  private startMantle() {
+    const c = this.climb!;
+    c.phase = "mantle";
+    c.t = 0;
+    c.from = this.feet.y;
+    const clipSpan = CLIP_TIMES.jumpAirHold - CLIP_TIMES.jumpTakeoff;
+    this.anim.play("jump", { from: CLIP_TIMES.jumpTakeoff, timeScale: clipSpan / CLIMB.mantleTime, holdAt: CLIP_TIMES.jumpAirHold, restart: true, fade: 0.08 });
   }
 
   private updateClimb(dt: number, dirX: number, dirZ: number, mag: number) {
@@ -487,8 +499,16 @@ class HueMover {
         this.anim.play("jump", { from: CLIP_TIMES.jumpAirHold - 0.1, holdAt: CLIP_TIMES.jumpAirHold, fade: 0.1 });
         return this.publish();
       }
-      this.feet.y = Math.min(this.feet.y + CLIMB.riseSpeed * dt, c.top + 0.01);
-      if (this.feet.y >= c.top + 0.01) {
+      this.feet.y = Math.min(this.feet.y + CLIMB.riseSpeed * dt, c.top - CLIMB.handReach);
+      if (this.feet.y >= c.top - CLIMB.handReach) this.startMantle();
+      return this.publish();
+    }
+    if (c.phase === "mantle") {
+      c.t += dt;
+      const k = Math.min(1, c.t / CLIMB.mantleTime);
+      const ease = 1 - (1 - k) * (1 - k);
+      this.feet.y = c.from + (c.top + 0.01 - c.from) * ease;
+      if (k >= 1) {
         c.phase = "over";
         c.t = 0;
       }
