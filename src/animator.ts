@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { HUE, type ClipName } from "./config";
+import { HUE, type ClipName, type IntroClipName } from "./config";
 
 type PlayOptions = {
   fade?: number;
@@ -16,26 +16,43 @@ type PlayOptions = {
 export class Animator {
   current: ClipName;
   private holdAt: number | undefined;
+  readonly actions: Partial<Record<ClipName, THREE.AnimationAction>>;
 
   constructor(
     readonly mixer: THREE.AnimationMixer,
-    readonly actions: Record<ClipName, THREE.AnimationAction>,
-    initial: ClipName,
+    actions: Partial<Record<ClipName, THREE.AnimationAction>>,
+    initial: IntroClipName,
   ) {
+    this.actions = actions;
     this.current = initial;
   }
 
-  get action() {
+  hasClip(name: ClipName): boolean {
+    return name in this.actions;
+  }
+
+  addActions(newActions: Partial<Record<ClipName, THREE.AnimationAction>>) {
+    Object.assign(this.actions, newActions);
+  }
+
+  get action(): THREE.AnimationAction | undefined {
     return this.actions[this.current];
   }
 
   get time() {
-    return this.action.time;
+    return this.action?.time ?? 0;
   }
 
   play(name: ClipName, { fade = HUE.crossfade, from = 0, timeScale = 1, holdAt, restart = false }: PlayOptions = {}) {
-    this.holdAt = holdAt;
     const to = this.actions[name];
+    if (!to) {
+      // Clip not loaded yet; fall back to idle if available, else skip
+      if (name !== "idle" && this.actions.idle) {
+        this.play("idle", { fade, timeScale });
+      }
+      return;
+    }
+    this.holdAt = holdAt;
     if (name === this.current && !restart) {
       to.timeScale = timeScale;
       return;
@@ -45,7 +62,7 @@ export class Animator {
     to.time = from;
     to.timeScale = timeScale;
     to.setEffectiveWeight(1).play();
-    if (prev !== to) {
+    if (prev && prev !== to) {
       if (fade > 0) prev.crossFadeTo(to, fade, false);
       else prev.stop();
     }
@@ -53,14 +70,16 @@ export class Animator {
   }
 
   setTimeScale(timeScale: number) {
-    if (this.holdAt === undefined) this.action.timeScale = timeScale;
+    const a = this.action;
+    if (this.holdAt === undefined && a) a.timeScale = timeScale;
   }
 
   /** Stops everything and shows `name` at `from`, with no blend. */
   snap(name: ClipName, from = 0) {
+    const a = this.actions[name];
+    if (!a) return;
     this.mixer.stopAllAction();
     this.holdAt = undefined;
-    const a = this.actions[name];
     a.reset();
     a.time = from;
     a.timeScale = 1;
@@ -71,9 +90,10 @@ export class Animator {
 
   update(dt: number) {
     this.mixer.update(dt);
-    if (this.holdAt !== undefined && this.action.time >= this.holdAt) {
-      this.action.time = this.holdAt;
-      this.action.timeScale = 0;
+    const a = this.action;
+    if (this.holdAt !== undefined && a && a.time >= this.holdAt) {
+      a.time = this.holdAt;
+      a.timeScale = 0;
     }
   }
 }

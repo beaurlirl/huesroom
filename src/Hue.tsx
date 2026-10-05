@@ -6,11 +6,12 @@ import { CapsuleCollider, RigidBody, type RapierCollider, type RapierRigidBody }
 import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { Animator } from "./animator";
-import { prepareClips } from "./clips";
-import { ASSETS, CLIP_NAMES, HUE, MOVE, type ClipName } from "./config";
+import { prepareIntroClips, prepareGameplayClips } from "./clips";
+import { ASSETS, GAMEPLAY_CLIPS, INTRO_CLIPS, HUE, MOVE, type ClipName, type IntroClipName } from "./config";
 import { initInput, readInput } from "./input";
 import { isRunning, runtime, useGame } from "./store";
 import { useHueController } from "./useHueController";
+import { useGameplayClipsAsync, preloadGameplayClips } from "./useGameplayClips";
 
 const IDLE_INPUT = { moveX: 0, moveZ: 0, run: false, jump: false };
 
@@ -34,32 +35,59 @@ function useSpawn() {
   }, [scene]);
 }
 
+preloadGameplayClips();
+
 export function Hue() {
   const gltf = useGLTF(ASSETS.hue, ASSETS.draco);
-  const animGltfs = useGLTF(CLIP_NAMES.map(ASSETS.anim));
+  const introGltfs = useGLTF(INTRO_CLIPS.map(ASSETS.anim));
+  const gameplayRawClips = useGameplayClipsAsync();
   const spawn = useSpawn();
   const phase = useGame((s) => s.phase);
 
   const root = gltf.scene.children[0]; // "Hue | 0.4572m placement"
   const armature = root.children[0];
+  const metresPerUnit = root.scale.x * armature.scale.x;
 
-  const { clips, seatedRootOffset, rollCurve, climbRiseSpeed } = useMemo(() => {
-    const raw = {} as Record<ClipName, THREE.AnimationClip>;
-    CLIP_NAMES.forEach((name, i) => (raw[name] = animGltfs[i].animations[0]));
-    return prepareClips(raw, root.scale.x * armature.scale.x);
-  }, [animGltfs, root, armature]);
+  const { introClips, seatedRootOffset } = useMemo(() => {
+    const raw = {} as Record<IntroClipName, THREE.AnimationClip>;
+    INTRO_CLIPS.forEach((name, i) => (raw[name] = introGltfs[i].animations[0]));
+    const prepared = prepareIntroClips(raw, metresPerUnit);
+    return { introClips: prepared.clips, seatedRootOffset: prepared.seatedRootOffset };
+  }, [introGltfs, metresPerUnit]);
+
+  const gameplayData = useMemo(() => {
+    if (!gameplayRawClips) return null;
+    return prepareGameplayClips(gameplayRawClips, metresPerUnit);
+  }, [gameplayRawClips, metresPerUnit]);
 
   const mixer = useMemo(() => new THREE.AnimationMixer(gltf.scene), [gltf.scene]);
-  const actions = useMemo(() => {
-    const out = {} as Record<ClipName, THREE.AnimationAction>;
-    for (const name of CLIP_NAMES) out[name] = mixer.clipAction(clips[name]);
-    for (const name of ["sit_to_stand", "jump", "jump_down", "jump_down_2", "fall_roll"] as const) {
-      out[name].setLoop(THREE.LoopOnce, 1);
-      out[name].clampWhenFinished = true;
-    }
+
+  const introActions = useMemo(() => {
+    const out = {} as Record<IntroClipName, THREE.AnimationAction>;
+    for (const name of INTRO_CLIPS) out[name] = mixer.clipAction(introClips[name]);
+    out.sit_to_stand.setLoop(THREE.LoopOnce, 1);
+    out.sit_to_stand.clampWhenFinished = true;
     return out;
-  }, [mixer, clips]);
-  const anim = useMemo(() => new Animator(mixer, actions, "sit"), [mixer, actions]);
+  }, [mixer, introClips]);
+
+  const anim = useMemo(() => new Animator(mixer, introActions, "sit"), [mixer, introActions]);
+
+  useEffect(() => {
+    if (!gameplayData) return;
+    const newActions = {} as Partial<Record<ClipName, THREE.AnimationAction>>;
+    for (const name of GAMEPLAY_CLIPS) {
+      const action = mixer.clipAction(gameplayData.clips[name]);
+      if (["jump", "jump_down", "jump_down_2", "fall_roll"].includes(name)) {
+        action.setLoop(THREE.LoopOnce, 1);
+        action.clampWhenFinished = true;
+      }
+      newActions[name] = action;
+    }
+    anim.addActions(newActions);
+  }, [gameplayData, mixer, anim]);
+
+  const rollCurve = gameplayData?.rollCurve ?? null;
+  const climbRiseSpeed = gameplayData?.climbRiseSpeed ?? 0.22;
   const toes = useMemo(
     () =>
       ["mixamorigLeftToeBase", "mixamorigRightToeBase"]
@@ -77,6 +105,8 @@ export function Hue() {
   const bodyRef = useRef<RapierRigidBody>(null);
   const colliderRef = useRef<RapierCollider>(null);
   const controller = useHueController(bodyRef, colliderRef, anim, rollCurve, climbRiseSpeed);
+
+  const actions = anim.actions;
 
   // First visible frame: a clip is bound, playing and evaluated, and the root is placed.
   useLayoutEffect(() => {
@@ -190,4 +220,4 @@ export function Hue() {
 }
 
 useGLTF.preload(ASSETS.hue, ASSETS.draco);
-CLIP_NAMES.forEach((name) => useGLTF.preload(ASSETS.anim(name)));
+INTRO_CLIPS.forEach((name) => useGLTF.preload(ASSETS.anim(name)));

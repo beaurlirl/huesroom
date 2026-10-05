@@ -8,6 +8,9 @@ import * as THREE from "three";
 import { AssetGate } from "./AssetGate";
 import { AudioDirector } from "./audio/AudioDirector";
 import { listedClips, loadedClips, musicPlaying } from "./audio/sfx";
+import { preloadGameplayClips } from "./useGameplayClips";
+
+preloadGameplayClips();
 import { bookBodies, Books } from "./Books";
 import { pushableBodies } from "./pushables";
 import { CameraRig } from "./CameraRig";

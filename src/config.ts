@@ -22,8 +22,11 @@ export const FX_TEXTURES = [
   "/fx/smoke_puff_3.png",
 ].map(asset);
 
-export const CLIP_NAMES = [
-  "idle",
+/** Clips needed before the intro can finish (seated pose + rise). */
+export const INTRO_CLIPS = ["sit", "sit_to_stand", "idle"] as const;
+
+/** Clips that can load in the background after the intro starts. */
+export const GAMEPLAY_CLIPS = [
   "walk",
   "run",
   "jump",
@@ -31,10 +34,12 @@ export const CLIP_NAMES = [
   "jump_down_2",
   "fall_roll",
   "climb_ladder",
-  "sit",
-  "sit_to_stand",
 ] as const;
+
+export const CLIP_NAMES = [...INTRO_CLIPS, ...GAMEPLAY_CLIPS] as const;
 export type ClipName = (typeof CLIP_NAMES)[number];
+export type IntroClipName = (typeof INTRO_CLIPS)[number];
+export type GameplayClipName = (typeof GAMEPLAY_CLIPS)[number];
 
 export const HUE = {
   height: 0.457,

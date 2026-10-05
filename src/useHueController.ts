@@ -111,8 +111,8 @@ class HueMover {
     private body: RigidBody,
     private collider: Collider,
     private anim: Animator,
-    private rollCurve: RootCurve,
-    private climbRiseSpeed: number,
+    public rollCurve: RootCurve,
+    public climbRiseSpeed: number,
   ) {
     this.ladder = readLadder();
     this.ray = new rapier.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: -1, z: 0 });
@@ -431,12 +431,13 @@ class HueMover {
     if (this.mode === "land" && this.landing) {
       this.landing.t += dt;
       const kind = this.landing.kind;
+      const action = a.action;
       const clipDone =
         kind === "hop"
           ? a.time >= CLIP_TIMES.jumpDownEnd
           : kind === "soft"
             ? a.time >= CLIP_TIMES.jumpAirHold + 0.8
-            : a.time >= a.action.getClip().duration - 0.05;
+            : action ? a.time >= action.getClip().duration - 0.05 : true;
       const unlocked = this.landing.t >= this.landing.lock;
       if (clipDone || (unlocked && inputMag > 0.05)) {
         this.landing = null;
@@ -640,7 +641,7 @@ export function useHueController(
   body: React.RefObject<RigidBody | null>,
   collider: React.RefObject<Collider | null>,
   anim: Animator,
-  rollCurve: RootCurve,
+  rollCurve: RootCurve | null,
   climbRiseSpeed: number,
 ) {
   const { world, rapier } = useRapier();
@@ -664,6 +665,14 @@ export function useHueController(
     };
   }, [world]);
 
+  // Update rollCurve and climbRiseSpeed when gameplay clips load.
+  useEffect(() => {
+    if (mover.current && rollCurve) {
+      mover.current.rollCurve = rollCurve;
+      mover.current.climbRiseSpeed = climbRiseSpeed;
+    }
+  }, [rollCurve, climbRiseSpeed]);
+
   // Stable identity: callers list this in effect dependencies (a fresh object per render
   // re-ran the restart effect on every re-render and snapped Hue back onto the chair).
   return useMemo(
@@ -671,7 +680,8 @@ export function useHueController(
       /** Lazily binds once the controller and the body/collider refs exist. */
       get() {
         if (!mover.current && cc.current && body.current && collider.current) {
-          mover.current = new HueMover(world, rapier, cc.current, body.current, collider.current, anim, rollCurve, climbRiseSpeed);
+          const defaultRollCurve = rollCurve ?? { times: new Float32Array([0, 1]), fwd: new Float32Array([0, 0]) };
+          mover.current = new HueMover(world, rapier, cc.current, body.current, collider.current, anim, defaultRollCurve, climbRiseSpeed);
         }
         return mover.current;
       },

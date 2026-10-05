@@ -1,5 +1,6 @@
 import * as THREE from "three";
-import type { ClipName } from "./config";
+import type { ClipName, GameplayClipName, IntroClipName } from "./config";
+import { GAMEPLAY_CLIPS, INTRO_CLIPS } from "./config";
 
 /**
  * Hips translation track layout (armature space, verified in scripts/inspect-clips.mjs):
@@ -136,6 +137,77 @@ export type PreparedClips = {
   /** How fast `climb_ladder` rises at timeScale 1 (m/s), before its rise was removed. */
   climbRiseSpeed: number;
 };
+
+export type PreparedIntroClips = {
+  clips: Record<IntroClipName, THREE.AnimationClip>;
+  seatedRootOffset: THREE.Vector3;
+};
+
+export type PreparedGameplayClips = {
+  clips: Record<GameplayClipName, THREE.AnimationClip>;
+  rollCurve: RootCurve;
+  climbRiseSpeed: number;
+};
+
+/**
+ * Prepares intro clips (sit, sit_to_stand, idle) synchronously.
+ * Called during initial load to allow intro to start without waiting for gameplay clips.
+ */
+export function prepareIntroClips(
+  raw: Record<IntroClipName, THREE.AnimationClip>,
+  metresPerUnit: number,
+): PreparedIntroClips {
+  const clips = {} as Record<IntroClipName, THREE.AnimationClip>;
+  for (const name of INTRO_CLIPS) {
+    const clip = raw[name].clone();
+    clip.name = name;
+    clips[name] = clip;
+  }
+
+  const idle0 = frame(clips.idle, "first");
+  const stsEnd = frame(clips.sit_to_stand, "last");
+  const stsShift = [idle0[0] - stsEnd[0], idle0[1] - stsEnd[1]] as const;
+  shiftHorizontal(clips.sit_to_stand, ...stsShift);
+
+  const sts0 = frame(clips.sit_to_stand, "first");
+  const sit0 = frame(clips.sit, "first");
+  stripHorizontal(clips.sit);
+  const sitShift = [sts0[0] - sit0[0], sts0[1] - sit0[1]] as const;
+  shiftHorizontal(clips.sit, ...sitShift);
+
+  stripHorizontal(clips.idle);
+
+  return {
+    clips,
+    seatedRootOffset: new THREE.Vector3(-sitShift[0] * metresPerUnit, 0, -sitShift[1] * metresPerUnit),
+  };
+}
+
+/**
+ * Prepares gameplay clips (walk, run, jump, etc.) after they load in background.
+ */
+export function prepareGameplayClips(
+  raw: THREE.AnimationClip[],
+  metresPerUnit: number,
+): PreparedGameplayClips {
+  const clips = {} as Record<GameplayClipName, THREE.AnimationClip>;
+  GAMEPLAY_CLIPS.forEach((name, i) => {
+    const clip = raw[i].clone();
+    clip.name = name;
+    clips[name] = clip;
+  });
+
+  const rollCurve = forwardCurve(clips.fall_roll, metresPerUnit);
+  const climbRiseSpeed = normalizeClimb(clips.climb_ladder, metresPerUnit, 0.166, -0.02);
+
+  for (const name of ["walk", "run", "jump_down", "jump_down_2", "fall_roll"] as const) {
+    stripHorizontal(clips[name]);
+  }
+  stripHorizontal(clips.jump);
+  clampRise(clips.jump);
+
+  return { clips, rollCurve, climbRiseSpeed };
+}
 
 /**
  * Clones and conditions the raw clips.
