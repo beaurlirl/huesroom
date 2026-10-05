@@ -59,6 +59,8 @@ type GameState = {
   /** Bumped on every restart; systems reset themselves when it changes. */
   runId: number;
   collected: number;
+  /** Everything is loaded and the scene has settled; the title card can clear. */
+  sceneReady: boolean;
   /** Final time of the last win, and the best time after it. */
   result: { time: number; best: number; isBest: boolean } | null;
   setPhase: (phase: Phase) => void;
@@ -74,6 +76,7 @@ export const useGame = create<GameState>((set, get) => ({
   paused: false,
   runId: 0,
   collected: 0,
+  sceneReady: false,
   result: null,
   setPhase: (phase) => set({ phase }),
   setDebug: (debug) => set({ debug }),
@@ -91,8 +94,8 @@ export const useGame = create<GameState>((set, get) => ({
     set({ collected: next, phase: "won", result: { time, best: isBest ? time : prev, isBest } });
   },
   restart: () => {
-    const { phase } = get();
-    if (phase === "loading" || phase === "resetting") return;
+    const { phase, sceneReady } = get();
+    if (phase === "loading" || phase === "resetting" || !sceneReady) return;
     set({ phase: "resetting", paused: false });
     // Fog over to white, reset everything behind it, then replay the intro.
     setTimeout(() => {

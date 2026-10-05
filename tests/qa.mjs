@@ -13,7 +13,7 @@ page.on('requestfailed', (r) => { if (!/ERR_ABORTED/.test(r.failure()?.errorText
 page.on('response', (r) => { if (r.status() >= 400) errors.push(`HTTP ${r.status()}: ${r.url()}`); });
 
 await page.goto(URL);
-await page.waitForFunction(() => window.__hue?.useGame.getState().phase === 'intro', null, { timeout: 60000 });
+await page.waitForFunction(() => { const g = window.__hue?.useGame.getState(); return g?.phase === 'intro' && g.sceneReady; }, null, { timeout: 60000 });
 
 // Pose monitor: every frame, hips/head vs feet, and root visibility.
 await page.evaluate(() => {

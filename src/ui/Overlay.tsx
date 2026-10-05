@@ -15,8 +15,7 @@ export function Overlay() {
   const { progress } = useProgress();
   const touch = useIsTouch();
   const runId = useGame((s) => s.runId);
-  // "card": the title card on white; "reveal": fading out to Hue on the chair.
-  const [stage, setStage] = useState<"card" | "reveal">("card");
+  const sceneReady = useGame((s) => s.sceneReady);
   const [pad, setPad] = useState(false);
   useEffect(() => {
     // Browsers only report a pad after its first button press, so poll as well as listen.
@@ -31,23 +30,25 @@ export function Overlay() {
     };
   }, []);
   // Intro timeline: title card on white → fade out to Hue on the chair → begin prompt.
-  // Replays (Play again / R) skip the card so they stay quick.
+  // Replays (Play again / R) skip the card so they stay quick. The card shows while Hue is
+  // still loading, so it holds past cardHold until the scene is ready.
+  const [cardDone, setCardDone] = useState(false);
   useEffect(() => {
     if (phase !== "intro") return;
     const hold = runId === 0 ? INTRO.cardHold : 0;
-    const reveal = setTimeout(() => setStage("reveal"), hold * 1000);
-    const ready = setTimeout(
-      () => {
-        setPhase("ready");
-        setStage("card");
-      },
-      (hold + INTRO.fadeFromWhite) * 1000,
-    );
+    const t = setTimeout(() => setCardDone(true), hold * 1000);
     return () => {
-      clearTimeout(reveal);
-      clearTimeout(ready);
+      clearTimeout(t);
+      setCardDone(false);
     };
-  }, [phase, setPhase, runId]);
+  }, [phase, runId]);
+  // Fading out to Hue on the chair.
+  const leavingCard = phase === "intro" && cardDone && sceneReady;
+  useEffect(() => {
+    if (!leavingCard) return;
+    const ready = setTimeout(() => setPhase("ready"), INTRO.fadeFromWhite * 1000);
+    return () => clearTimeout(ready);
+  }, [leavingCard, setPhase]);
 
   // Any key / tap begins.
   useEffect(() => {
@@ -65,8 +66,7 @@ export function Overlay() {
   }, [phase, setPhase]);
 
   const loading = phase === "loading";
-  const white = loading || phase === "resetting" || (phase === "intro" && stage === "card");
-  const leavingCard = phase === "intro" && stage === "reveal";
+  const white = loading || phase === "resetting" || (phase === "intro" && !leavingCard);
 
   const prompt = touch ? "tap to begin" : pad ? "press A to begin" : "press any key";
 

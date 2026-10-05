@@ -1,6 +1,6 @@
 "use client";
 
-import { PerformanceMonitor, Stats } from "@react-three/drei";
+import { PerformanceMonitor, Stats, useGLTF } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Physics, useRapier } from "@react-three/rapier";
 import { Suspense, useEffect, useRef, useState } from "react";
@@ -18,7 +18,7 @@ import { GamepadDirector } from "./input/GamepadDirector";
 import { useHotkeys } from "./input/hotkeys";
 import { DebugView } from "./DebugView";
 import { Effects } from "./Effects";
-import { CAMERA } from "./config";
+import { ASSETS, CAMERA } from "./config";
 import { Hue } from "./Hue";
 import { Lighting } from "./Lighting";
 import { Room, roomColliders } from "./Room";
@@ -30,13 +30,22 @@ import { ExitScreen } from "./ui/Exit";
 import { Overlay } from "./ui/Overlay";
 import { theme } from "./ui/theme";
 
-/** Starts the intro once everything has rendered for a couple of frames. */
+/** Starts the title card as soon as the room is in; Hue keeps loading behind it. */
+function RoomLoaded() {
+  useGLTF(ASSETS.room, ASSETS.draco);
+  useEffect(() => {
+    if (useGame.getState().phase === "loading") useGame.getState().setPhase("intro");
+  }, []);
+  return null;
+}
+
+/** Lets the title card clear once everything has rendered for a couple of frames. */
 function SceneReady() {
   const frames = useRef(0);
   useFrame(() => {
-    if (useGame.getState().phase !== "loading" || !runtime.hueReady) return;
+    if (useGame.getState().sceneReady || !runtime.hueReady) return;
     // ~0.5 s of physics so the stacked books are at rest before the fade-in.
-    if (++frames.current >= 30) useGame.getState().setPhase("intro");
+    if (++frames.current >= 30) useGame.setState({ sceneReady: true });
   });
   return null;
 }
@@ -156,6 +165,9 @@ export default function Game() {
           flipflops={3}
           onFallback={() => setDpr(1)}
         />
+        <Suspense fallback={null}>
+          <RoomLoaded />
+        </Suspense>
         <Suspense fallback={null}>
           <AssetGate>
             <Lighting />

@@ -188,6 +188,3 @@ export function Hue() {
     </>
   );
 }
-
-useGLTF.preload(ASSETS.hue, ASSETS.draco);
-CLIP_NAMES.forEach((name) => useGLTF.preload(ASSETS.anim(name)));

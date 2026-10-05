@@ -8,6 +8,9 @@ import { ASSETS, CLIP_NAMES, FX_TEXTURES } from "./config";
  * Loads every asset before rendering its children. Physics components must never render in a
  * pass that suspends: @react-three/rapier creates bodies during render, and a discarded
  * (suspended) render leaks them — we saw 8 book bodies instead of 2.
+ *
+ * Each call suspends in turn, so the room downloads alone first (see RoomLoaded), then Hue and
+ * his clips arrive behind the title card.
  */
 export function AssetGate({ children }: { children: ReactNode }) {
   useGLTF(ASSETS.room, ASSETS.draco);
