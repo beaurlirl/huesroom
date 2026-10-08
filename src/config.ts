@@ -96,11 +96,18 @@ export const CLIMB = {
   /** Hands above the feet at the top of the climb loop (measured 0.27–0.33 m). The climb
    *  stops once the hands reach the lip; a mantle covers the rest. */
   handReach: 0.3,
-  /** Hop from hands-on-the-lip up onto the ledge (s). */
-  mantleTime: 0.25,
+  /**
+   * Hop from hands-on-the-lip up onto the ledge (s): the rise for a full `handReach`, shorter
+   * (down to `mantleTimeMin`) for lower ledges. It leaves at the climb's rise speed and comes to
+   * rest at the lip, so the climb loop flows into it without a lurch.
+   */
+  mantleTime: 0.35,
+  mantleTimeMin: 0.22,
   overDistance: 0.1,
   overPastLip: 0.05,
-  overTime: 0.15,
+  /** Slide across the lip. It starts `overlap` s before the rise ends, so rise and slide are one arc. */
+  overTime: 0.2,
+  overlap: 0.06,
   ladderSpeed: 0.22,
   ladderExitMargin: 0.08,
   ladderExitTime: 0.4,
@@ -198,6 +205,8 @@ export const CAMERA = {
   smoothX: 0.4,
   smoothY: 0.5,
   smoothLook: 0.25,
+  /** While climbing a ledge the camera follows this much tighter (× smoothY / smoothLook), so the hop up never outruns it. */
+  climbSmoothScale: 0.45,
   yawClamp: (55 * Math.PI) / 180,
   pitchMin: (-65 * Math.PI) / 180,
   pitchMax: (10 * Math.PI) / 180,

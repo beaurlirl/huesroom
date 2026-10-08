@@ -218,10 +218,12 @@ export function CameraRig() {
     st.ladderW = clamp(smoothDamp(st.ladderW, nearLadder ? 1 : 0, st.vlw, C.cornerBlend, dt), 0, 1);
     const t = targets(st);
     st.x = smoothDamp(st.x, t.x, st.vx, C.smoothX, dt);
-    st.y = smoothDamp(st.y, t.y, st.vy, C.smoothY, dt);
+    // The hop over a ledge's lip is quick: follow it closely so Hue never rides up out of frame.
+    const rise = runtime.climbing ? C.climbSmoothScale : 1;
+    st.y = smoothDamp(st.y, t.y, st.vy, C.smoothY * rise, dt);
     st.look.set(
       smoothDamp(st.look.x, t.look.x, st.vlx, C.smoothLook, dt),
-      smoothDamp(st.look.y, t.look.y, st.vly, C.smoothLook, dt),
+      smoothDamp(st.look.y, t.look.y, st.vly, C.smoothLook * rise, dt),
       smoothDamp(st.look.z, t.look.z, st.vlz, C.smoothLook, dt),
     );
 

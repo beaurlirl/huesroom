@@ -113,6 +113,8 @@ export const runtime = {
   /** Hue's feet in world space. */
   feet: new THREE.Vector3(),
   grounded: true,
+  /** Mid ledge climb: the camera follows vertically with less lag. */
+  climbing: false,
   /** Camera yaw (radians, 0 = looking toward -Z). Movement is relative to this. */
   cameraYaw: 0,
   cameraPos: new THREE.Vector3(),

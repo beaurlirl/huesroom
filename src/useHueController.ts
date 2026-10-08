@@ -14,7 +14,24 @@ import { runtime } from "./store";
 type Rapier = ReturnType<typeof useRapier>["rapier"];
 type Mode = "ground" | "air" | "land" | "climb" | "ladder";
 type Landing = { kind: "hop" | "roll" | "soft"; t: number; lock: number; rollPrev: number };
-type Climb = { phase: "up" | "mantle" | "over"; top: number; startY: number; dirX: number; dirZ: number; t: number; over: number; from: number };
+type Climb = {
+  phase: "up" | "mantle";
+  top: number;
+  startY: number;
+  dirX: number;
+  dirZ: number;
+  t: number;
+  /** Horizontal distance to travel across the lip. */
+  over: number;
+  /** Mantle: where the rise and the slide began, how long the rise takes, and its opening speed (m/s). */
+  from: number;
+  x0: number;
+  z0: number;
+  riseTime: number;
+  speed0: number;
+  /** The clip has been retimed to land on the ledge. */
+  settling: boolean;
+};
 type LadderMove = { kind: "enterTop" | "exitTop" | "exitBottom"; from: THREE.Vector3; to: THREE.Vector3; t: number; time: number };
 
 const R = HUE.capsuleRadius;
@@ -88,10 +105,6 @@ class HueMover {
   private landing: Landing | null = null;
   private climb: Climb | null = null;
 
-  /** Top of the ledge being climbed (world y), or null when not climbing. */
-  get climbTop() {
-    return this.climb ? this.climb.top : null;
-  }
   private pushTimer = 0;
   private ladderMove: LadderMove | null = null;
   private speedSmoothed = 0;
@@ -353,6 +366,7 @@ class HueMover {
     this.body.setNextKinematicTranslation({ x: this.feet.x, y: this.feet.y + CAPSULE_CENTER, z: this.feet.z });
     runtime.feet.copy(this.feet);
     runtime.grounded = this.grounded || this.mode === "climb" || this.mode === "ladder";
+    runtime.climbing = this.mode === "climb";
   }
 
   private takeOff(speed: number) {
@@ -466,23 +480,33 @@ class HueMover {
     // Step far enough to put the capsule centre a few cm past the lip, however far away the
     // face was when the climb started (the probe reaches 0.1 m beyond the capsule).
     const over = Math.max(CLIMB.overDistance, faceDist + CLIMB.overPastLip);
-    this.climb = { phase: "up", top, startY: this.feet.y, dirX, dirZ, t: 0, over, from: 0 };
+    this.climb = { phase: "up", top, startY: this.feet.y, dirX, dirZ, t: 0, over, from: 0, x0: 0, z0: 0, riseTime: 0, speed0: 0, settling: false };
     this.vel.set(0, 0, 0);
     this.yaw = yawFor(dirX, dirZ);
     this.pushTimer = 0;
-    // Low ledges are already within reach: straight to the mantle.
-    if (top - this.feet.y <= CLIMB.handReach) this.startMantle();
+    // Low ledges are already within reach: straight to the mantle, from standing still.
+    if (top - this.feet.y <= CLIMB.handReach) this.startMantle(0);
     else this.anim.play("climb_ladder", { timeScale: CLIMB.riseSpeed / this.climbRiseSpeed, fade: 0.1 });
   }
 
-  /** Hands are on the lip: hop the rest of the way up (the jump's take-off into its tuck). */
-  private startMantle() {
+  /**
+   * Hands are on the lip: hop the rest of the way up (the jump's take-off into its tuck, then
+   * its descent into the landing crouch while he slides across the lip). `speed0` is the speed
+   * the body is already rising at, so the hop picks up where the climb loop left off.
+   */
+  private startMantle(speed0: number) {
     const c = this.climb!;
+    const rise = c.top + 0.01 - this.feet.y;
     c.phase = "mantle";
     c.t = 0;
     c.from = this.feet.y;
+    c.x0 = this.feet.x;
+    c.z0 = this.feet.z;
+    c.speed0 = speed0;
+    c.riseTime = THREE.MathUtils.lerp(CLIMB.mantleTimeMin, CLIMB.mantleTime, THREE.MathUtils.clamp(rise / CLIMB.handReach, 0, 1));
+    c.settling = false;
     const clipSpan = CLIP_TIMES.jumpAirHold - CLIP_TIMES.jumpTakeoff;
-    this.anim.play("jump", { from: CLIP_TIMES.jumpTakeoff, timeScale: clipSpan / CLIMB.mantleTime, holdAt: CLIP_TIMES.jumpAirHold, restart: true, fade: 0.08 });
+    this.anim.play("jump", { from: CLIP_TIMES.jumpTakeoff, timeScale: clipSpan / c.riseTime, restart: true, fade: 0.08 });
   }
 
   private updateClimb(dt: number, dirX: number, dirZ: number, mag: number) {
@@ -500,33 +524,41 @@ class HueMover {
         return this.publish();
       }
       this.feet.y = Math.min(this.feet.y + CLIMB.riseSpeed * dt, c.top - CLIMB.handReach);
-      if (this.feet.y >= c.top - CLIMB.handReach) this.startMantle();
+      if (this.feet.y >= c.top - CLIMB.handReach) this.startMantle(CLIMB.riseSpeed);
       return this.publish();
     }
-    if (c.phase === "mantle") {
-      c.t += dt;
-      const k = Math.min(1, c.t / CLIMB.mantleTime);
-      const ease = 1 - (1 - k) * (1 - k);
-      this.feet.y = c.from + (c.top + 0.01 - c.from) * ease;
-      if (k >= 1) {
-        c.phase = "over";
-        c.t = 0;
-      }
-      return this.publish();
-    }
-    // Over the lip onto the top. The probe already checked this spot is clear, and going
-    // through the controller here snags on the ledge's edge a few mm under the feet.
-    const step = Math.max(0, Math.min(dt, CLIMB.overTime - c.t));
+
+    // Mantle: one arc over the lip. The rise is a cubic Hermite (leaves at the climb's speed,
+    // arrives at rest), and the slide across the lip starts a little before it ends.
     c.t += dt;
-    const d = (c.over / CLIMB.overTime) * step;
-    this.feet.x += c.dirX * d;
-    this.feet.z += c.dirZ * d;
-    if (c.t >= CLIMB.overTime) {
+    const rt = c.riseTime;
+    const slideStart = rt - CLIMB.overlap;
+    const total = slideStart + CLIMB.overTime;
+    const k = Math.min(1, c.t / rt);
+    const rise = c.top + 0.01 - c.from;
+    const m0 = Math.min(c.speed0 * rt, 3 * rise); // slope per unit k; capped so the rise stays monotonic
+    const k2 = k * k;
+    const k3 = k2 * k;
+    this.feet.y = c.from + m0 * (k3 - 2 * k2 + k) + rise * (3 * k2 - 2 * k3);
+    const s = THREE.MathUtils.clamp((c.t - slideStart) / CLIMB.overTime, 0, 1);
+    const e = s * s * (3 - 2 * s);
+    this.feet.x = c.x0 + c.dirX * c.over * e;
+    this.feet.z = c.z0 + c.dirZ * c.over * e;
+
+    // Once the rise is done the clip runs on from the tuck to the touch-down, which it reaches as he lands.
+    if (!c.settling && c.t >= rt) {
+      c.settling = true;
+      this.anim.setTimeScale((CLIP_TIMES.jumpLand - CLIP_TIMES.jumpAirHold) / Math.max(total - rt, 1e-3));
+    }
+    if (c.t >= total) {
+      // Landed on the ledge: hand over to the soft-landing recovery (any input cancels it).
       this.climb = null;
-      this.mode = "ground";
+      this.feet.y = c.top + 0.01;
+      this.mode = "land";
+      this.landing = { kind: "soft", t: 0, lock: 0, rollPrev: 0 };
       this.grounded = true;
       this.lastGroundedAt = this.now;
-      this.anim.play(mag > 0.05 ? "walk" : "idle");
+      this.anim.play("jump", { timeScale: 1.3 });
     }
     this.publish();
   }
