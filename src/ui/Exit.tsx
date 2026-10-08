@@ -6,7 +6,13 @@ import { Frost, GLASS } from "./Frost";
 import { theme } from "./theme";
 
 /** Fog to white, then the leaving line, then navigate. */
-const EXIT = { fogMs: 1100, lineDelay: 0.55, navigateMs: 2300 };
+const EXIT = {
+  fogMs: 1100,
+  lineDelay: 0.55,
+  navigateMs: 2300,
+  /** Still here this long after navigating (an app shell opened the link outside the page): clear the fog. */
+  stayedMs: 1500,
+};
 
 const useExit = create<{ target: string | null; go: (url: string) => void; cancel: () => void }>((set) => ({
   target: null,
@@ -29,8 +35,14 @@ export function ExitScreen() {
   useEffect(() => {
     if (!target) return;
     const t = setTimeout(() => window.location.assign(target), EXIT.navigateMs);
-    return () => clearTimeout(t);
-  }, [target]);
+    // In a browser the page unloads and this never fires. In an app shell that opens external links
+    // in the system browser the game stays put, so give the room back instead of leaving it fogged.
+    const back = setTimeout(cancel, EXIT.navigateMs + EXIT.stayedMs);
+    return () => {
+      clearTimeout(t);
+      clearTimeout(back);
+    };
+  }, [target, cancel]);
 
   // Coming back with the browser's back button restores this page from cache: clear the glass.
   useEffect(() => {

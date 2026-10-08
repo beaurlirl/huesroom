@@ -1,5 +1,7 @@
 # Deploying to hue.onl/huesroom
 
+(For the iOS app, see [APP_STORE.md](APP_STORE.md).)
+
 ## Simplest: a static folder inside hue.onl (no separate Vercel project)
 
 The game is fully client-side, so it exports to plain static files:
