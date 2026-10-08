@@ -7,8 +7,8 @@
 export const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 export const asset = (path: string) => `${BASE_PATH}${path}`;
 
+/** The room model belongs to the level (src/levels.ts). */
 export const ASSETS = {
-  room: asset("/room/room.glb"),
   hue: asset("/hue/hue.glb"),
   draco: asset("/draco/"),
   anim: (name: ClipName) => asset(`/hue/anim/${name}.glb`),

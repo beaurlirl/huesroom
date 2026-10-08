@@ -3,10 +3,11 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useAudioSettings } from "./audio/sfx";
 import { OUTRO } from "./config";
-import { COIN_COUNT, formatTime, runtime, useGame } from "./store";
+import { formatTime, runtime, useGame } from "./store";
 import { exitTo } from "./ui/Exit";
 import { Frost, GLASS, useFrostPresence } from "./ui/Frost";
 import { theme } from "./ui/theme";
+import { useLevel } from "./useLevel";
 
 const COARSE = "(pointer: coarse)";
 export function useIsTouch() {
@@ -50,12 +51,13 @@ function Plate({ label, children, align = "left" }: { label: string; children: R
 
 function Counter() {
   const collected = useGame((s) => s.collected);
+  const total = useGame((s) => s.totalCoins);
   return (
     <Plate label="coins">
       {/* Re-keyed on every coin so the bounce replays. */}
       <span key={collected} className="inline-block origin-left" style={{ animation: collected ? "hud-bounce 0.35s ease-out" : undefined }}>
         {pad2(collected)}
-        <span className="opacity-60"> / {COIN_COUNT}</span>
+        <span className="opacity-60"> / {total}</span>
       </span>
     </Plate>
   );
@@ -113,6 +115,7 @@ function Veil({ open, ms, right, children }: { open: boolean; ms: number; right:
 
 /** The unlock pop-up: finishing the room opens the main Hue at hue.onl (owner's request). */
 function UnlockCard({ delay }: { delay: number }) {
+  const total = useGame((s) => s.totalCoins);
   return (
     <div className="flex w-full flex-col gap-4 p-5 sm:p-6" style={{ background: theme.paper, color: theme.ink, border: `1px solid ${theme.ink}`, animation: GLASS.in(0.9, delay) }}>
       <div className="ui-label flex items-center gap-2" style={{ opacity: 1 }}>
@@ -121,7 +124,7 @@ function UnlockCard({ delay }: { delay: number }) {
       </div>
       <div className="text-4xl font-bold leading-[0.95] sm:text-5xl">{theme.unlockLabel}</div>
       <p className="text-sm leading-snug" style={{ color: theme.muted, textTransform: "none", letterSpacing: 0 }}>
-        You found all {COIN_COUNT} coins. The main Hue is open to you now.
+        You found all {total} coins. The main Hue is open to you now.
       </p>
       {/* Leaves through the exit animation (fog to white, then go). */}
       <a href={theme.unlockUrl} onClick={exitTo} className="ui-cta self-start text-sm" style={{ background: theme.ink, color: theme.paper, borderColor: theme.ink }}>
@@ -139,6 +142,8 @@ export function WinPanel({ share }: { share?: React.ReactNode }) {
   const phase = useGame((s) => s.phase);
   const result = useGame((s) => s.result);
   const restart = useGame((s) => s.restart);
+  const total = useGame((s) => s.totalCoins);
+  const level = useLevel();
   // The result outlives the "won" phase while the glass clears on a restart.
   const [shownResult, setShownResult] = useState(result);
   if (result && result !== shownResult) setShownResult(result);
@@ -156,7 +161,7 @@ export function WinPanel({ share }: { share?: React.ReactNode }) {
   if (!r) return null;
   const t = OUTRO.stagger;
   return (
-    <Veil open={phase === "won"} ms={VEIL_MS.won} right={`location 01 · home · all ${COIN_COUNT} coins`}>
+    <Veil open={phase === "won"} ms={VEIL_MS.won} right={`location ${pad2(level.number)} · ${level.name} · all ${total} coins`}>
       {stage !== "panel" ? (
         <div className="flex flex-col items-center gap-5 text-center">
           <span
@@ -170,7 +175,7 @@ export function WinPanel({ share }: { share?: React.ReactNode }) {
             style={{ color: theme.muted, animation: stage === "dissolve" ? GLASS.out(OUTRO.titleOut, 0.06) : GLASS.in(0.9, 1.1) }}
           >
             <span className="ui-rule hidden w-10 sm:block" />
-            <span className="tabular-nums">location 01 · complete · {formatTime(r.time)}</span>
+            <span className="tabular-nums">location {pad2(level.number)} · complete · {formatTime(r.time)}</span>
             <span className="ui-rule hidden w-10 sm:block" />
           </div>
         </div>
@@ -204,8 +209,9 @@ function PausePanel({ open }: { open: boolean }) {
   const setPaused = useGame((s) => s.setPaused);
   const restart = useGame((s) => s.restart);
   const touch = useIsTouch();
+  const level = useLevel();
   return (
-    <Veil open={open} ms={VEIL_MS.pause} right={<Timer />}>
+    <Veil open={open} ms={VEIL_MS.pause} right={level.mode === "run" ? <Timer /> : level.name}>
       <div className="flex w-full max-w-md flex-col gap-6">
         <span className="text-7xl font-bold leading-[0.85] sm:text-8xl" style={{ animation: GLASS.in(0.8, 0.15) }}>
           paused
@@ -234,6 +240,7 @@ export function Hud({ share }: { share?: React.ReactNode }) {
   const paused = useGame((s) => s.paused);
   const setPaused = useGame((s) => s.setPaused);
   const touch = useIsTouch();
+  const level = useLevel();
 
   const visible = phase === "playing" || phase === "won";
   return (
@@ -250,9 +257,11 @@ export function Hud({ share }: { share?: React.ReactNode }) {
             (pause)
           </button>
         )}
-        <Plate label="time" align="right">
-          <Timer />
-        </Plate>
+        {level.mode === "run" && (
+          <Plate label="time" align="right">
+            <Timer />
+          </Plate>
+        )}
       </div>
       <PausePanel open={paused && phase === "playing"} />
       <WinPanel share={share} />

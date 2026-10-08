@@ -4,7 +4,7 @@ import { useThree } from "@react-three/fiber";
 import { useEffect, useState } from "react";
 import * as THREE from "three";
 import { BASE_PATH, CAMERA, HUE } from "./config";
-import { COIN_COUNT, formatTime, runtime, useGame } from "./store";
+import { formatTime, runtime, useGame } from "./store";
 import { theme } from "./ui/theme";
 
 // Share card layout (1080×1920, Instagram Story). Restyle here and in ui/theme.ts.
@@ -144,7 +144,7 @@ export async function renderShareCard(time: number): Promise<Blob | null> {
   g.fillStyle = theme.blue;
   g.fillRect(pad, kickerY - 24, 22, 22);
   g.font = font(700, 34);
-  g.fillText(up(`all ${COIN_COUNT} coins`), pad + 40, kickerY);
+  g.fillText(up(`all ${useGame.getState().totalCoins} coins`), pad + 40, kickerY);
   g.fillStyle = theme.ink;
   g.font = font(700, 250);
   g.fillText(formatTime(time), pad - 8, kickerY + 230);
@@ -164,7 +164,7 @@ export async function renderShareCard(time: number): Promise<Blob | null> {
 }
 
 export function shareCaption(time: number) {
-  return `i got all ${COIN_COUNT} coins in ${formatTime(time)} in ${theme.wordmark} and unlocked ${theme.unlockLabel} → ${window.location.origin}${BASE_PATH}`;
+  return `i got all ${useGame.getState().totalCoins} coins in ${formatTime(time)} in ${theme.wordmark} and unlocked ${theme.unlockLabel} → ${window.location.origin}${BASE_PATH}`;
 }
 
 /** Win-panel Share button: phone share sheet (Instagram et al.), else download + copy caption. */

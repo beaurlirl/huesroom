@@ -60,6 +60,10 @@ await page.waitForFunction(() => window.__hue.useGame.getState().phase === 'play
 await page.waitForTimeout(500);
 const s3 = await state();
 check('timer running once playing', s3.elapsed > 0.3 && s3.elapsed < 1.5, `elapsed ${s3.elapsed}`);
+// Level data: the coin total is counted from the room model and drives the HUD.
+const lv = await page.evaluate(() => ({ id: window.__hue.level().id, total: window.__hue.useGame.getState().totalCoins }));
+check('level 1 loads; coin total counted from the room model', lv.id === 'home' && lv.total === 11, JSON.stringify(lv));
+check('HUD counter shows the level total', await page.getByText('/ 11', { exact: false }).first().isVisible());
 {
   await page.waitForTimeout(300);
   const a = await page.evaluate(() => ({ listed: window.__hue.audio.listedClips().sort().join(','), loaded: window.__hue.audio.loadedClips().sort().join(',') }));
@@ -182,6 +186,17 @@ check('touch controls hidden on title, shown in play', titleVisible === '0' && p
 const bloomOff = await mp.evaluate(() => window.__hue.gl.getPixelRatio());
 check('phone pixel ratio capped at 1.5', bloomOff <= 1.5, `${bloomOff}`);
 await mctx.close();
+
+// An unknown ?level= plays the first level instead of failing.
+{
+  const c2 = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const p2 = await c2.newPage();
+  await p2.goto(URL + (URL.includes('?') ? '&' : '?') + 'level=nope');
+  await p2.waitForFunction(() => window.__hue?.level, null, { timeout: 60000 });
+  const id = await p2.evaluate(() => window.__hue.level().id);
+  check('unknown ?level= falls back to the first level', id === 'home', id);
+  await c2.close();
+}
 
 const realErrors = errors.filter((e) => !/deprecated parameters/.test(e));
 check('no console/page/network errors', realErrors.length === 0, realErrors.slice(0, 5).join(' | '));

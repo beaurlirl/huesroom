@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { create } from "zustand";
+import { LEVELS, levelById } from "./levels";
 
 export type Phase =
   | "loading" // assets streaming in
@@ -10,7 +11,11 @@ export type Phase =
   | "won"
   | "resetting"; // fading to white before a restart
 
-export const COIN_COUNT = 11;
+/** `?level=<id>` picks the level (dev and tests); anything else plays the first. */
+function initialLevelId() {
+  if (typeof window === "undefined") return LEVELS[0].id;
+  return levelById(new URLSearchParams(window.location.search).get("level")).id;
+}
 /** Restart: the room fogs over to white glass before it resets behind it. */
 export const RESET_FADE_MS = 650;
 const BEST_KEY = "huesroom.best";
@@ -58,12 +63,17 @@ type GameState = {
   paused: boolean;
   /** Bumped on every restart; systems reset themselves when it changes. */
   runId: number;
+  /** Which level is loaded (an id from LEVELS). */
+  levelId: string;
   collected: number;
+  /** Coins in this level: counted from the room model once it has loaded. */
+  totalCoins: number;
   /** Everything is loaded and the scene has settled; the title card can clear. */
   sceneReady: boolean;
   /** Final time of the last win, and the best time after it. */
   result: { time: number; best: number; isBest: boolean } | null;
   setPhase: (phase: Phase) => void;
+  setTotalCoins: (n: number) => void;
   setDebug: (debug: boolean) => void;
   setPaused: (paused: boolean) => void;
   collect: () => void;
@@ -75,17 +85,20 @@ export const useGame = create<GameState>((set, get) => ({
   debug: false,
   paused: false,
   runId: 0,
+  levelId: initialLevelId(),
   collected: 0,
+  totalCoins: 0,
   sceneReady: false,
   result: null,
   setPhase: (phase) => set({ phase }),
+  setTotalCoins: (totalCoins) => set({ totalCoins }),
   setDebug: (debug) => set({ debug }),
   setPaused: (paused) => set({ paused: paused && get().phase === "playing" }),
   collect: () => {
-    const { collected, phase } = get();
-    if (phase !== "playing") return;
+    const { collected, phase, totalCoins } = get();
+    if (phase !== "playing" || totalCoins === 0) return;
     const next = collected + 1;
-    if (next < COIN_COUNT) return set({ collected: next });
+    if (next < totalCoins) return set({ collected: next });
     const time = runtime.elapsed;
     const prev = readBest();
     const isBest = prev === null || time < prev;

@@ -1,14 +1,14 @@
 "use client";
 
-import { useGLTF } from "@react-three/drei";
 import { CuboidCollider, RigidBody, type RapierRigidBody } from "@react-three/rapier";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { playSfx } from "./audio/sfx";
-import { ASSETS, BOOKS } from "./config";
+import { BOOKS } from "./config";
 import { pushableBodies } from "./pushables";
 import { blenderName, colliderMeta } from "./Room";
 import { useGame } from "./store";
+import { useRoom } from "./useLevel";
 
 type Book = {
   name: string;
@@ -35,7 +35,7 @@ const cache = new WeakMap<THREE.Object3D, Book[]>();
  * from userData.
  */
 export function Books() {
-  const { scene } = useGLTF(ASSETS.room, ASSETS.draco);
+  const { scene } = useRoom();
   const runId = useGame((s) => s.runId);
 
   const books = useMemo<Book[]>(() => {

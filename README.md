@@ -24,6 +24,29 @@ drag peeks. On touch devices: joystick (push past 70% to run), jump button, drag
 to peek, pause button. Xbox/standard gamepad: left stick moves (past 70% or RB/RT = run), A jumps
 and confirms menus, right stick peeks, Menu pauses, View restarts.
 
+## Levels
+
+A level is a room model plus one entry in [`src/levels.ts`](src/levels.ts): `id`, `number`, `name`,
+`mode` (`run` = timed, `explore` = no clock), the `room` URL and the `spawn` node. Level 1 is
+`home`. `?level=<id>` plays another one; an unknown id plays the first.
+
+The model's nodes are the level (Blender names; GLTFLoader's sanitised ones are matched through
+`userData.name`):
+
+| Node | | What it does |
+|---|---|---|
+| `COL_*` boxes | required | Fixed colliders, hidden. User data: `standable: false` (can't be climbed), `retired` (skipped), `bounce_pad` + `bounce_apex_m` (trampoline), `ladder` + `bottom_z_blender`, `top_z_blender`, `approach_from_blender_xy`, `exit_dir_blender_xy` |
+| `COL_Boundary south` | required | Its inner face is the open wall: the camera's plane |
+| `COIN_01`, `COIN_02`, … | required | One node per coin. The level's coin total is however many there are |
+| the `spawn` node | required | Where Hue starts; `facing_xy` (Blender XY) gives the facing |
+| `BOOK_KICK_01`, … | optional | Kickable books (`mass_kg`, `friction`, `restitution` in user data) |
+| `COL_Spray can*` + `ROOM_static` | optional | Pushable cans cut out of the room mesh |
+| `Beanbag \| couch brown` | optional | Squashes on bounces; its hull replaces `COL_Beanbag` |
+
+Still specific to level 1, so the next level will need its own: the seated start (Hue stands up
+from a chair; a street has no chair), the camera zones in `CAMERA` (beanbag corner, ladder), the
+lighting rig in `Lighting.tsx`, the win copy and hue.onl link, and the single best-time key.
+
 ## Tests
 
 Both need the dev server on port 3100 (`npx next dev -p 3100`) and use the Playwright Chromium
@@ -31,7 +54,7 @@ in `~/Library/Caches/ms-playwright`.
 
 ```bash
 npm run test:routes    # every route in prompt 1.5, via teleport + scripted input (18 legs)
-npm run test:qa        # 24 end-to-end checks: intro lock, timer, keyboard play, pause, restart,
+npm run test:qa        # 28 end-to-end checks: intro lock, timer, keyboard play, pause, restart,
                        # win + best time, pose monitor, audio, touch UI, console errors
 URL="http://localhost:3200/huesroom/?test" npm run test:qa   # against a sub-path build
 ```
@@ -40,6 +63,7 @@ URL="http://localhost:3200/huesroom/?test" npm run test:qa   # against a sub-pat
 
 | | |
 |---|---|
+| `src/levels.ts`, `src/useLevel.ts` | the level list (room model, spawn node, name, mode) and the hooks that read the current level |
 | `src/config.ts` | every tunable (movement, climb, camera, coins, books, bloom) and asset URLs |
 | `src/clips.ts` | animation clean-up (Hips axes, seat/rise alignment, climb clip turned around) |
 | `src/useHueController.ts` | character controller: walk/run, jump, climb, ladder, bounce, landings, book kicks |

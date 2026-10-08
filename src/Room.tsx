@@ -1,13 +1,12 @@
 "use client";
 
-import { useGLTF } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { ConvexHullCollider, CuboidCollider, RigidBody } from "@react-three/rapier";
 import { useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
-import { ASSETS } from "./config";
 import { DYNAMIC_PROP_PREFIXES } from "./pushables";
 import { runtime } from "./store";
+import { preloadRoom, useRoom } from "./useLevel";
 
 export type BoxCollider = {
   name: string;
@@ -86,7 +85,7 @@ function buildColliders(scene: THREE.Object3D): BoxCollider[] {
 }
 
 export function Room() {
-  const { scene } = useGLTF(ASSETS.room, ASSETS.draco);
+  const { scene } = useRoom();
 
   const bag = useMemo(() => {
     let found: THREE.Object3D | undefined;
@@ -119,7 +118,7 @@ export function Room() {
     roomColliders.push(...list);
     const south = list.find((c) => c.name === "COL_Boundary south");
     if (south) runtime.openWallZ = south.center.z - south.halfExtents.z;
-    else console.warn("room.glb: COL_Boundary south missing; using default open-wall z");
+    else console.warn("room model: COL_Boundary south missing; using default open-wall z");
     return { colliders: list, hull: beanbagHull(scene) };
   }, [scene]);
 
@@ -167,4 +166,4 @@ export function Room() {
   );
 }
 
-useGLTF.preload(ASSETS.room, ASSETS.draco);
+preloadRoom();

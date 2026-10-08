@@ -3,6 +3,7 @@
 import { useGLTF, useTexture } from "@react-three/drei";
 import type { ReactNode } from "react";
 import { ASSETS, CLIP_NAMES, FX_TEXTURES } from "./config";
+import { useRoom } from "./useLevel";
 
 /**
  * Loads every asset before rendering its children. Physics components must never render in a
@@ -13,7 +14,7 @@ import { ASSETS, CLIP_NAMES, FX_TEXTURES } from "./config";
  * his clips arrive behind the title card.
  */
 export function AssetGate({ children }: { children: ReactNode }) {
-  useGLTF(ASSETS.room, ASSETS.draco);
+  useRoom();
   useGLTF(ASSETS.hue, ASSETS.draco);
   useGLTF(CLIP_NAMES.map(ASSETS.anim));
   useTexture(FX_TEXTURES);

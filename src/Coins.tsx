@@ -1,15 +1,17 @@
 "use client";
 
-import { useGLTF, useTexture } from "@react-three/drei";
+import { useTexture } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { playSfx } from "./audio/sfx";
-import { ASSETS, COINS, FX_TEXTURES, HUE } from "./config";
+import { COINS, FX_TEXTURES, HUE } from "./config";
 import { createCoinEnvironment } from "./fx/coinEnvironment";
 import { SpriteBatch } from "./fx/SpriteBatch";
+import { COIN_NODE } from "./levels";
 import { blenderName } from "./Room";
-import { COIN_COUNT, isRunning, runtime, useGame } from "./store";
+import { isRunning, runtime, useGame } from "./store";
+import { useRoom } from "./useLevel";
 
 type Glint = { t: number; dur: number; wait: number; x: number; y: number; size: number; rot: number };
 type Puff = { age: number; life: number; x: number; z: number; rise: number; rot: number; spin: number; peak: number; tex: number; seed: number; burst: boolean };
@@ -64,9 +66,9 @@ function newPuff(age = 0, burst = false): Puff {
 
 const isTouch = () => typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
 
-/** The 11 chrome G coins: spin, bob, glints, smoke shimmer, collection (prompt 1.8 / 2.7). */
+/** The level's chrome G coins (every COIN_nn node in the room model): spin, bob, glints, smoke shimmer, collection (prompt 1.8 / 2.7). */
 export function Coins() {
-  const { scene } = useGLTF(ASSETS.room, ASSETS.draco);
+  const { scene } = useRoom();
   const camera = useThree((s) => s.camera);
   const gl = useThree((s) => s.gl);
   const coinEnv = useMemo(() => createCoinEnvironment(gl), [gl]);
@@ -80,7 +82,7 @@ export function Coins() {
     const list: Coin[] = [];
     scene.traverse((o) => {
       const name = blenderName(o);
-      if (!/^COIN_\d+$/.test(name)) return;
+      if (!COIN_NODE.test(name)) return;
       const mesh = o as THREE.Mesh;
       // Own material per coin so each can fade out on its own.
       const material = (mesh.material as THREE.MeshPhysicalMaterial).clone();
@@ -107,7 +109,6 @@ export function Coins() {
     });
     list.sort((a, b) => blenderName(a.mesh).localeCompare(blenderName(b.mesh)));
     list.forEach((c, i) => (c.phase = (i / list.length) * Math.PI * 2));
-    if (list.length !== COIN_COUNT) console.warn(`room.glb: expected ${COIN_COUNT} coins, found ${list.length}`);
     return list;
   }, [scene, coinEnv]);
 
@@ -133,13 +134,13 @@ export function Coins() {
   }, [coins, runId, smokePerCoin]);
 
   const glintBatch = useMemo(
-    () => new SpriteBatch(COIN_COUNT * COINS.glintsPerCoin, [sparkle], { additive: true, toneMapped: false }),
-    [sparkle],
+    () => new SpriteBatch(coins.length * COINS.glintsPerCoin, [sparkle], { additive: true, toneMapped: false }),
+    [coins.length, sparkle],
   );
   const [s0, s1, s2, s3] = smokeTex;
   const smokeBatch = useMemo(
-    () => new SpriteBatch(COIN_COUNT * (smokePerCoin + COINS.burstPuffs), [s0, s1, s2, s3]),
-    [smokePerCoin, s0, s1, s2, s3],
+    () => new SpriteBatch(coins.length * (smokePerCoin + COINS.burstPuffs), [s0, s1, s2, s3]),
+    [coins.length, smokePerCoin, s0, s1, s2, s3],
   );
   useEffect(() => () => glintBatch.dispose(), [glintBatch]);
   useEffect(() => () => smokeBatch.dispose(), [smokeBatch]);
@@ -180,7 +181,7 @@ export function Coins() {
         if (d < COINS.sensorRadius + HUE.capsuleRadius) {
           c.collected = true;
           c.popT = 0;
-          const n = COIN_COUNT - coins.filter((k) => !k.collected).length;
+          const n = coins.length - coins.filter((k) => !k.collected).length;
           playSfx("chime", { pitch: 1 + n * 0.04 });
           for (let k = 0; k < COINS.burstPuffs; k++) c.puffs.push(newPuff(0, true));
           useGame.getState().collect();

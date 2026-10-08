@@ -11,6 +11,7 @@ import { ASSETS, CLIP_NAMES, HUE, MOVE, type ClipName } from "./config";
 import { initInput, readInput } from "./input";
 import { isRunning, runtime, useGame } from "./store";
 import { useHueController } from "./useHueController";
+import { useLevel, useRoom } from "./useLevel";
 
 const IDLE_INPUT = { moveX: 0, moveZ: 0, run: false, jump: false };
 
@@ -22,16 +23,17 @@ export function yawForDirection(x: number, z: number) {
 }
 
 function useSpawn() {
-  const { scene } = useGLTF(ASSETS.room, ASSETS.draco);
+  const { scene } = useRoom();
+  const level = useLevel();
   return useMemo(() => {
-    const node = scene.getObjectByName("SPAWN_Hue_chair");
-    if (!node) throw new Error("room.glb: SPAWN_Hue_chair missing");
+    const node = scene.getObjectByName(level.spawn);
+    if (!node) throw new Error(`level "${level.id}": spawn node ${level.spawn} missing from ${level.room}`);
     node.updateWorldMatrix(true, false);
     const feet = node.getWorldPosition(new THREE.Vector3());
     // facing_xy is Blender XY; three.js direction is (x, 0, -y).
     const [bx, by] = (node.userData.facing_xy as [number, number] | undefined) ?? [0, -1];
     return { feet, yaw: yawForDirection(bx, -by) };
-  }, [scene]);
+  }, [scene, level]);
 }
 
 export function Hue() {

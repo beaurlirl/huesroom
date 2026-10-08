@@ -1,14 +1,14 @@
 "use client";
 
-import { useGLTF } from "@react-three/drei";
 import { ConvexHullCollider, RigidBody, type RapierRigidBody } from "@react-three/rapier";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { playSfx } from "./audio/sfx";
-import { ASSETS, BOOKS, CANS } from "./config";
+import { BOOKS, CANS } from "./config";
 import { pushableBodies } from "./pushables";
 import { blenderName, colliderMeta, roomColliders } from "./Room";
 import { useGame } from "./store";
+import { useRoom } from "./useLevel";
 
 type Can = { name: string; group: THREE.Group; position: THREE.Vector3; halfHeight: number; radius: number; hull: Float32Array };
 
@@ -124,7 +124,7 @@ function extractCans(scene: THREE.Object3D): Can[] {
 
 /** Pushable spray cans (user request), like the books: shoved walking, kicked running. */
 export function SprayCans() {
-  const { scene } = useGLTF(ASSETS.room, ASSETS.draco);
+  const { scene } = useRoom();
   const runId = useGame((s) => s.runId);
   const cans = useMemo(() => extractCans(scene), [scene]);
   const bodies = useRef<(RapierRigidBody | null)[]>([]);

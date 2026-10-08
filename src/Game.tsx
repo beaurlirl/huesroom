@@ -1,6 +1,6 @@
 "use client";
 
-import { PerformanceMonitor, Stats, useGLTF } from "@react-three/drei";
+import { PerformanceMonitor, Stats } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Physics, useRapier } from "@react-three/rapier";
 import { Suspense, useEffect, useRef, useState } from "react";
@@ -18,24 +18,35 @@ import { GamepadDirector } from "./input/GamepadDirector";
 import { useHotkeys } from "./input/hotkeys";
 import { DebugView } from "./DebugView";
 import { Effects } from "./Effects";
-import { ASSETS, CAMERA } from "./config";
+import { CAMERA } from "./config";
+import { COIN_NODE } from "./levels";
 import { Hue } from "./Hue";
 import { Lighting } from "./Lighting";
-import { Room, roomColliders } from "./Room";
+import { blenderName, Room, roomColliders } from "./Room";
 import { ShareButton, ShareSnapshot } from "./ShareCard";
 import { SprayCans } from "./SprayCans";
 import { TouchControls } from "./TouchControls";
 import { runtime, useGame } from "./store";
+import { getLevel, useRoom } from "./useLevel";
 import { ExitScreen } from "./ui/Exit";
 import { Overlay } from "./ui/Overlay";
 import { theme } from "./ui/theme";
 
-/** Starts the title card as soon as the room is in; Hue keeps loading behind it. */
+/**
+ * Starts the title card as soon as the room is in; Hue keeps loading behind it. The room model
+ * decides how many coins the level has, so the total is counted here, before play begins.
+ */
 function RoomLoaded() {
-  useGLTF(ASSETS.room, ASSETS.draco);
+  const { scene } = useRoom();
   useEffect(() => {
-    if (useGame.getState().phase === "loading") useGame.getState().setPhase("intro");
-  }, []);
+    let coins = 0;
+    scene.traverse((o) => {
+      if (COIN_NODE.test(blenderName(o))) coins++;
+    });
+    const game = useGame.getState();
+    game.setTotalCoins(coins);
+    if (game.phase === "loading") game.setPhase("intro");
+  }, [scene]);
   return null;
 }
 
@@ -124,6 +135,7 @@ export default function Game() {
         __hue: {
           useGame,
           runtime,
+          level: getLevel,
           colliders: roomColliders,
           books: bookBodies,
           pushables: pushableBodies,
