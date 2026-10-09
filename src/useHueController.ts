@@ -37,6 +37,8 @@ type LadderMove = { kind: "enterTop" | "exitTop" | "exitBottom"; from: THREE.Vec
 const R = HUE.capsuleRadius;
 const CAPSULE_CENTER = HUE.capsuleHalfHeight + R; // feet → capsule centre
 const HEIGHT = 2 * CAPSULE_CENTER;
+/** How far below the feet groundCollider() looks; snap-to-ground lands him up to ~6 cm above a steep surface. */
+const GROUND_PROBE = 0.12;
 
 const wrapAngle = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
 const approach = (v: number, target: number, rate: number) => v + (target - v) * Math.min(1, rate);
@@ -167,9 +169,27 @@ class HueMover {
     return this.world.castRayAndGetNormal(this.ray, max, true, undefined, undefined, undefined, undefined, filter);
   }
 
-  /** Collider directly under the feet, if any. */
+  /**
+   * Collider the capsule would touch first if it dropped straight down a few cm: what Hue just
+   * landed on. A single ray from the capsule centre isn't enough: on the beanbag's steep edge the
+   * capsule rests on its rounded bottom off-centre, and the surface under the centre line can
+   * fall away past the ray's reach (it missed the bag about one landing in eight).
+   */
   private groundCollider() {
-    const hit = this.cast(this.feet.x, this.feet.y + 0.02, this.feet.z, 0, -1, 0, 0.08, this.solid(false));
+    const hit = this.world.castShape(
+      { x: this.feet.x, y: this.feet.y + CAPSULE_CENTER, z: this.feet.z },
+      { x: 0, y: 0, z: 0, w: 1 },
+      { x: 0, y: -1, z: 0 },
+      this.collider.shape,
+      0,
+      GROUND_PROBE,
+      true,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      this.solid(false),
+    );
     return hit ? hit.collider : null;
   }
 
