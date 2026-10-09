@@ -156,6 +156,13 @@ const frozen = await state(); await page.waitForTimeout(500);
 check('win freezes timer and input', (await state()).elapsed === frozen.elapsed && frozen.phase === 'won');
 // The outro holds the title on the glass before the results settle in.
 check('win panel shows', await page.getByRole('button', { name: 'Play again' }).waitFor({ timeout: 8000 }).then(() => true, () => false));
+// The win line is "hue made it outside"; nothing leaves the page and nothing is left behind in storage or cookies.
+check('win panel says hue made it outside, come back soon', (await page.getByText('hue made it outside').first().isVisible()) && (await page.getByText('come back soon for his next move').isVisible()));
+const leaks = await page.evaluate(() => ({
+  links: [...document.querySelectorAll('a[href]')].filter((a) => new URL(a.href, location.href).origin !== location.origin).length,
+  unlocked: localStorage.getItem('hue.unlocked') !== null || document.cookie.includes('hue_unlocked'),
+}));
+check('no outbound links, no unlock flag or cookie', leaks.links === 0 && !leaks.unlocked, JSON.stringify(leaks));
 await page.getByRole('button', { name: 'Play again' }).click();
 const w2 = await winRun(2500);
 check('best time kept when slower', !w2.isBest && Math.abs(w2.best - w1.time) < 1e-6, `run1 ${w1.time.toFixed(2)} run2 ${w2.time.toFixed(2)} best ${w2.best.toFixed(2)}`);

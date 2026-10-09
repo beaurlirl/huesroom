@@ -16,12 +16,8 @@ What the build does and does not do, which is what App Review and the privacy la
 
 - Everything it needs is inside `out/`: room, Hue, clips, Draco decoder, fonts, music. No CDN, no
   API calls, no analytics, no accounts. Offline works.
-- Stores on the device only: best time, mute settings, and a `hue.unlocked` flag
-  (`localStorage`, plus a cookie that only matters on the web).
-- The one outbound link is **"unlock hue.onl"** on the win panel (`src/ui/theme.ts`). A Capacitor
-  shell normally hands external navigation to Safari, leaving the game in place; the exit fog
-  clears itself after ~4 s if the page is still there (not yet tried in a real shell). If the app should
-  not link out, remove that button in `src/Hud.tsx` before building.
+- Stores on the device only: best time and mute settings (`localStorage`). No cookies.
+- No outbound links: the win screen ends on "hue made it outside" and the game never leaves the page.
 - Pauses and silences audio when the app goes to the background; it stays paused until the player resumes.
 - Safe areas (notch, home bar) are handled; landscape is the intended orientation.
 
@@ -44,6 +40,5 @@ from a root URL".
 - [ ] App icon (1024 px), screenshots, age rating, and a support / privacy URL.
 - [ ] Privacy label: "Data Not Collected" holds as long as nothing is added from the
       `cursor/huesroom-path-and-analytics-5249` branch (Vercel Web Analytics).
-- [ ] Decide whether the app keeps the "unlock hue.onl" link (see above).
 - [ ] Music is the owner's own GarageBand tracks and the font is Union (the owner's), see
       `public/audio/CREDITS.md`.

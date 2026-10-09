@@ -45,7 +45,7 @@ The model's nodes are the level (Blender names; GLTFLoader's sanitised ones are 
 
 Still specific to level 1, so the next level will need its own: the seated start (Hue stands up
 from a chair; a street has no chair), the camera zones in `CAMERA` (beanbag corner, ladder), the
-lighting rig in `Lighting.tsx`, the win copy and hue.onl link, and the single best-time key.
+lighting rig in `Lighting.tsx`, the win line ("hue made it outside"), and the single best-time key.
 
 ## Tests
 

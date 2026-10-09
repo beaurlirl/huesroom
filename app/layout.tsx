@@ -15,7 +15,7 @@ const union = localFont({
 // Absolute URLs for link previews. The game is expected at hue.onl/huesroom (NEXT_PUBLIC_BASE_PATH).
 const site = process.env.NEXT_PUBLIC_SITE_URL ?? "https://hue.onl";
 const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
-const description = "Hue leaves home. Collect all 11 coins, as fast as you can, and unlock hue.onl. A game by Gest, Lower Manhattan.";
+const description = "Hue leaves home. Collect every coin as fast as you can and help him make it outside. A game by Gest, Lower Manhattan.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(site),

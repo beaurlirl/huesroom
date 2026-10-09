@@ -4,7 +4,6 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useAudioSettings } from "./audio/sfx";
 import { OUTRO } from "./config";
 import { formatTime, runtime, useGame } from "./store";
-import { exitTo } from "./ui/Exit";
 import { Frost, GLASS, useFrostPresence } from "./ui/Frost";
 import { theme } from "./ui/theme";
 import { useLevel } from "./useLevel";
@@ -113,23 +112,16 @@ function Veil({ open, ms, right, children }: { open: boolean; ms: number; right:
   );
 }
 
-/** The unlock pop-up: finishing the room opens the main Hue at hue.onl (owner's request). */
-function UnlockCard({ delay }: { delay: number }) {
+/** How the level ends: Hue got outside, and you found every coin. */
+function MadeItCard({ delay }: { delay: number }) {
   const total = useGame((s) => s.totalCoins);
   return (
     <div className="flex w-full flex-col gap-4 p-5 sm:p-6" style={{ background: theme.paper, color: theme.ink, border: `1px solid ${theme.ink}`, animation: GLASS.in(0.9, delay) }}>
       <div className="ui-label flex items-center gap-2" style={{ opacity: 1 }}>
         <span className="inline-block h-1.5 w-1.5" style={{ background: theme.ink }} />
-        unlocked
+        all {total} coins
       </div>
-      <div className="text-4xl font-bold leading-[0.95] sm:text-5xl">{theme.unlockLabel}</div>
-      <p className="text-sm leading-snug" style={{ color: theme.muted, textTransform: "none", letterSpacing: 0 }}>
-        You found all {total} coins. The main Hue is open to you now.
-      </p>
-      {/* Leaves through the exit animation (fog to white, then go). */}
-      <a href={theme.unlockUrl} onClick={exitTo} className="ui-cta self-start text-sm" style={{ background: theme.ink, color: theme.paper, borderColor: theme.ink }}>
-        enter {theme.unlockLabel} →
-      </a>
+      <div className="text-4xl font-bold leading-[0.95] sm:text-5xl">{theme.madeIt}</div>
     </div>
   );
 }
@@ -186,12 +178,12 @@ export function WinPanel({ share }: { share?: React.ReactNode }) {
             <span className="text-7xl font-bold leading-[0.85] tabular-nums sm:text-8xl">{formatTime(r.time)}</span>
             <span className="text-sm">{r.isBest ? "new best time" : `best ${formatTime(r.best)}`}</span>
           </div>
-          <UnlockCard delay={t} />
+          <MadeItCard delay={t} />
           {/* Where he goes next: this room is stop one of Hue's journey (user request). */}
           <div className="flex items-start gap-3" style={{ animation: GLASS.in(0.8, t * 2) }}>
             <span className="ui-label mt-0.5 whitespace-nowrap">next</span>
             <span className="ui-rule mt-1.5 w-8 shrink-0" />
-            <span className="text-sm leading-snug">follow along for the next locations hue gets to</span>
+            <span className="text-sm leading-snug">come back soon for his next move</span>
           </div>
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2" style={{ animation: GLASS.in(0.8, t * 3) }}>
             <Btn onClick={restart}>play again</Btn>

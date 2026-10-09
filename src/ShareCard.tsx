@@ -96,7 +96,7 @@ async function ensureFonts() {
 /**
  * Composes the 1080×1920 card on a 2D canvas, after directory.onl: Union, uppercase, a header
  * with a hairline rule, a square-framed photo, a blue kicker over a huge bold time, and a solid
- * blue band announcing the hue.onl unlock.
+ * blue band with how it ended and where to play.
  */
 export async function renderShareCard(time: number): Promise<Blob | null> {
   if (!snapshot) return null;
@@ -149,13 +149,13 @@ export async function renderShareCard(time: number): Promise<Blob | null> {
   g.font = font(700, 250);
   g.fillText(formatTime(time), pad - 8, kickerY + 230);
 
-  // Blue band: the unlock, and where to play.
+  // Blue band: how it ended, and where to play.
   const bandH = 150;
   g.fillStyle = theme.blue;
   g.fillRect(0, h - bandH, w, bandH);
   g.fillStyle = theme.paper;
-  g.font = font(700, 44);
-  g.fillText(up(`unlocked ${theme.unlockLabel}`), pad, h - bandH / 2 + 16);
+  g.font = font(700, 40);
+  g.fillText(up(theme.madeIt), pad, h - bandH / 2 + 15);
   const link = up(`${window.location.host}${BASE_PATH}`);
   g.font = font(400, 32);
   g.fillText(link, w - pad - g.measureText(link).width, h - bandH / 2 + 12);
@@ -164,7 +164,7 @@ export async function renderShareCard(time: number): Promise<Blob | null> {
 }
 
 export function shareCaption(time: number) {
-  return `i got all ${useGame.getState().totalCoins} coins in ${formatTime(time)} in ${theme.wordmark} and unlocked ${theme.unlockLabel} → ${window.location.origin}${BASE_PATH}`;
+  return `i got all ${useGame.getState().totalCoins} coins in ${formatTime(time)} in ${theme.wordmark}: ${theme.madeIt} → ${window.location.origin}${BASE_PATH}`;
 }
 
 /** Win-panel Share button: phone share sheet (Instagram et al.), else download + copy caption. */

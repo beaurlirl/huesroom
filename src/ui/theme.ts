@@ -14,7 +14,6 @@ export const theme = {
   blue: "#0047ff",
   blueSoft: "#7aa2ff",
   muted: "rgba(10, 10, 10, 0.55)",
-  /** The main site this game unlocks. */
-  unlockUrl: "https://hue.onl",
-  unlockLabel: "hue.onl",
+  /** The line that ends level 1: on the win panel and the share card. */
+  madeIt: "hue made it outside",
 };
