@@ -43,6 +43,19 @@ The model's nodes are the level (Blender names; GLTFLoader's sanitised ones are 
 | `COL_Spray can*` + `ROOM_static` | optional | Pushable cans cut out of the room mesh |
 | `Beanbag \| couch brown` | optional | Squashes on bounces; its hull replaces `COL_Beanbag` |
 
+### Level design budget (Hue is 0.457 m tall; numbers come from `src/config.ts`)
+
+| | |
+|---|---|
+| Speed | walks 0.55 m/s, runs 0.80 m/s |
+| Body | capsule 0.12 m wide, 0.46 m tall: gaps under about 0.13 m wide are impassable, ceilings need 0.47 m clear |
+| Steps | walks up anything up to 0.10 m without jumping |
+| Jump | rises about 0.60 m, hangs about 0.95 s, reaches about 0.65 m forward |
+| Ledge climb | flat, standable tops 0.10 to 0.55 m above his feet, with 0.47 m of head-room above them |
+| Taller than 0.55 m | needs a jump chain (platforms about 0.5 m apart vertically and under 0.65 m across) or a ladder |
+| Drops | over 0.2 m is a hop landing (brief control lock); over 0.9 m is a roll (longer lock) |
+| Coins | picked up within about 0.14 m of the body; a jump reaches about 0.9 m above a standing surface |
+
 Still specific to level 1, so the next level will need its own: the seated start (Hue stands up
 from a chair; a street has no chair), the camera zones in `CAMERA` (beanbag corner, ladder), the
 lighting rig in `Lighting.tsx`, the win line ("hue made it outside"), and the single best-time key.
