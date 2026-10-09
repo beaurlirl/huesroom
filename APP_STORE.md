@@ -8,7 +8,7 @@ The game is a static, fully client-side site, so any app that can show a web vie
 npm run export:app      # -> out/  (24 MB, served from the root of the app's own web server)
 ```
 
-`export:hue` is the same build for hue.onl/huesroom (base path `/huesroom`); the app build has no
+`export:hue` is the same build for a sub-path host (base path `/huesroom`); the app build has no
 base path. Open `out/index.html` through the wrapper's local server, **not** `file://` (the models
 and audio are fetched).
 
@@ -18,6 +18,7 @@ What the build does and does not do, which is what App Review and the privacy la
   API calls, no analytics, no accounts. Offline works.
 - Stores on the device only: best time and mute settings (`localStorage`). No cookies.
 - No outbound links: the win screen ends on "hue made it outside" and the game never leaves the page.
+- No AI or chat in the launch build; Hue is silent. (AI Hue is planned for later and will change the privacy label.)
 - Pauses and silences audio when the app goes to the background; it stays paused until the player resumes.
 - Safe areas (notch, home bar) are handled; landscape is the intended orientation.
 
@@ -38,6 +39,7 @@ from a root URL".
 - [ ] Run it on a real iPhone (≥ 30 fps, controls feel right). Only desktop Chromium has been
       tested, including an iPhone-landscape viewport with touch.
 - [ ] App icon (1024 px), screenshots, age rating, and a support / privacy URL.
+- [ ] App name: not decided. Plain "Hue" is already an existing 2016 game, and store names are unique, so reserve the name as soon as the Apple account is approved.
 - [ ] Privacy label: "Data Not Collected" holds as long as nothing is added from the
       `cursor/huesroom-path-and-analytics-5249` branch (Vercel Web Analytics).
 - [ ] Music is the owner's own GarageBand tracks and the font is Union (the owner's), see

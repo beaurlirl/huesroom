@@ -1,58 +1,30 @@
-# Deploying to hue.onl/huesroom
+# What deploys where
 
-(For the iOS app, see [APP_STORE.md](APP_STORE.md).)
+As of 2026-10-09.
 
-## Simplest: a static folder inside hue.onl (no separate Vercel project)
+- **Pushing `main` auto-deploys Production on the Vercel project `huesroom`**: https://huesroom.vercel.app (served at the root, no base path). That is the web game's home for now. Don't push `main` without the owner's go.
+- **`hue.onl/huesroom` is a separate static copy** held in the private repo `beaurlirl/hue.onl` (built 2026-10-06). Pushing the game does **not** change it. The original hue.onl site is being kept unassociated with the game and levels for the moment, so leave that copy alone until the owner decides what to do with it (remove or redirect).
+- **The iOS app** is a native shell around `npm run export:app`: see [APP_STORE.md](APP_STORE.md).
+- Closed unmerged on 2026-10-09: huesroom #1 (analytics and path prefix), huesroom #2 (lighter start), hue.onl #1 (rewrites proxying `/huesroom`). Their branches still exist.
 
-The game is fully client-side, so it exports to plain static files:
+## Builds
 
 ```bash
-npm run export:hue                     # -> out/, built for the /huesroom path
+npm run export:app   # -> out/  no base path (the iOS wrapper, or any root-path host)
+npm run export:hue   # -> out/  base path /huesroom (only for a sub-path host such as the paused hue.onl copy)
+```
+
+## The paused hue.onl copy (only if the owner asks)
+
+```bash
+npm run export:hue
 rm -rf ~/Desktop/hue.onl/huesroom && cp -R out ~/Desktop/hue.onl/huesroom
-cd ~/Desktop/hue.onl && git checkout -b huesroom && git add huesroom && git commit -m "Add Hue's Room at /huesroom"
-git push -u origin huesroom            # Vercel builds a preview for the branch
+cd ~/Desktop/hue.onl && git checkout -b huesroom && git add huesroom && git commit -m "Update Hue's Room at /huesroom"
+git push -u origin huesroom            # Vercel builds a preview for the branch; merge to main to go live
 ```
-
-Try the preview, then merge `huesroom` into `main` to put it live at hue.onl/huesroom.
-Tested: the export served as a `/huesroom` folder from a plain static server passes QA 25/25
-and the gamepad checks. (~24 MB, mostly the room model and the music.)
-
-## Alternative: its own Vercel project + a rewrite
-
-Nothing here has been run yet — it needs your go-ahead (prompt milestone 8: preview only; don't
-touch hue.onl's project or production until you say so).
-
-## 1. The game's own Vercel project (`huesroom`)
-
-1. Push this repo to GitHub (`gh` is logged in as **beaurlirl**):
-   `gh repo create beaurlirl/huesroom --private --source . --push` (or `--public`).
-2. Import it in Vercel as a new project named **huesroom** (framework: Next.js, root: this folder).
-3. Environment variables (Production and Preview):
-   - `NEXT_PUBLIC_BASE_PATH` = `/huesroom`
-   - `NEXT_PUBLIC_SITE_URL` = `https://hue.onl` (absolute URLs for link previews)
-4. Every branch push then builds a preview at `huesroom-<hash>.vercel.app/huesroom/`.
-
-## 2. Serving it at hue.onl/huesroom (later, when you say so)
-
-hue.onl is a static site (`~/Desktop/hue.onl`, repo `beaurlirl/hue.onl`). Add rewrites to its
-`vercel.json` so `/huesroom` is proxied to the game's project — the game already serves everything
-(pages, `_next/` chunks, models, audio) under `/huesroom`:
-
-```json
-{
-  "rewrites": [
-    { "source": "/huesroom", "destination": "https://huesroom.vercel.app/huesroom" },
-    { "source": "/huesroom/:path*", "destination": "https://huesroom.vercel.app/huesroom/:path*" }
-  ]
-}
-```
-
-(Merge with the existing `headers` block; replace `huesroom.vercel.app` with the project's
-production domain.)
 
 ## Checks before going live
 
-- [ ] Real-phone test (≥ 30 fps, controls feel right).
-- [ ] Audio licence: clips are Adobe "Aero Audio Starter Assets" — confirm they may be used on a
-      public website (see `public/audio/CREDITS.md`).
-- [ ] `URL="https://<preview>/huesroom/?test" npm run test:qa` passes against the preview.
+- [ ] Real-phone test (30 fps or better, controls feel right).
+- [ ] `URL="https://<preview>/?test" npm run test:qa` passes against the preview.
+- [ ] Audio: the music is the owner's own tracks (see `public/audio/CREDITS.md`); no third-party clips.

@@ -1,8 +1,8 @@
 # hue's room
 
-A small 3D browser platformer: Hue (0.457 m tall) climbs, jumps, bounces and kicks books around a
-green gallery room, collecting 11 chrome G coins against the clock. Built from
-`../CURSOR_GAME_DEV_BUILD_PROMPT.md`.
+A small 3D platformer for the web and iOS: Hue (0.457 m tall) climbs, jumps, bounces and kicks
+things around a level, collecting its coins against the clock. One level so far (his room, 11
+coins); levels are data, see [Levels](#levels). Agents: read [AGENTS.md](AGENTS.md) first.
 
 Next.js 16 · React 19 · three 0.182 · @react-three/fiber 9 · drei 10 · @react-three/rapier 2 ·
 @react-three/postprocessing · zustand · Tailwind 4.
@@ -54,7 +54,7 @@ in `~/Library/Caches/ms-playwright`.
 
 ```bash
 npm run test:routes    # every route in prompt 1.5, via teleport + scripted input (18 legs)
-npm run test:qa        # 28 end-to-end checks: intro lock, timer, keyboard play, pause, restart,
+npm run test:qa        # 30 end-to-end checks: intro lock, timer, keyboard play, pause, restart,
                        # win + best time, pose monitor, audio, touch UI, console errors
 URL="http://localhost:3200/huesroom/?test" npm run test:qa   # against a sub-path build
 ```
