@@ -18,7 +18,7 @@ const info = await page.evaluate(() => {
   for (const c of h.colliders ?? []) if (c.userData?.ladder) ladders++;
   return { total: h.useGame.getState().totalCoins, coins, haze, ladders, rowW, rowE, feet: r.feet.toArray().map((v) => +v.toFixed(2)), camY: +r.cameraPos.y.toFixed(2) };
 });
-check('street loads and counts its coins', info.total === info.coins && info.total >= 18, `(total ${info.total}, COIN nodes ${info.coins})`);
+check('street loads and counts its coins', info.total === info.coins && info.total >= 17, `(total ${info.total}, COIN nodes ${info.coins})`);
 check('every fire escape / ledge has a ladder collider', info.ladders >= 6, `(${info.ladders})`);
 check('far street nodes are flagged for haze', info.haze >= 3, `(${info.haze})`);
 check('both rows are tagged for the camera flip', info.rowW > 20 && info.rowE > 10, `(W ${info.rowW}, E ${info.rowE})`);

@@ -8,6 +8,7 @@ import { CAMERA as BASE_CAMERA, FLAGS } from "./config";
 import type { LevelCamera } from "./levels";
 import { useIsTouch } from "./Hud";
 import { pollGamepad } from "./input/gamepad";
+import { colliderMeta } from "./Room";
 import { runtime, useGame } from "./store";
 import { useLevel } from "./useLevel";
 
@@ -179,8 +180,9 @@ export function CameraRig() {
 
   const ray = useRef(new rapier.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: -1 }));
   const inside = useRef(new Set<number>());
-  /** Only fixed room geometry blocks the view (not Hue, the books or sensors). */
-  const blocks = (c: RapierCollider) => !c.isSensor() && !!c.parent()?.isFixed() && !inside.current.has(c.handle);
+  /** Only fixed room geometry blocks the view (not Hue, the books, sensors or invisible rail walls, which are flagged `camera_pass` in the model). */
+  const blocks = (c: RapierCollider) =>
+    !c.isSensor() && !!c.parent()?.isFixed() && !inside.current.has(c.handle) && !colliderMeta.get(c.handle)?.userData.camera_pass;
   const isClear = (x: number, y: number, z: number, target: THREE.Vector3) => {
     const o = { x, y, z };
     inside.current.clear();
