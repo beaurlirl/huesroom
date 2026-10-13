@@ -215,6 +215,9 @@ export const CANS = {
 
 export const BLOOM = { threshold: 2.2, intensity: 0.8 };
 
+/** Street shimmer made steadier (see fx/steady.ts): how much blurrier than the exact mip level colour maps are sampled (mip levels). 0 = off. */
+export const STEADY = { mipBias: 0.5 };
+
 export const CAMERA = {
   planeOffset: 0.02, // in front of COL_Boundary south's inner face
   xClamp: 1.15,

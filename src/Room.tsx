@@ -7,6 +7,7 @@ import * as THREE from "three";
 import { DYNAMIC_PROP_PREFIXES } from "./pushables";
 import { runtime } from "./store";
 import { hazeMaterial } from "./fx/haze";
+import { steadyTextures } from "./fx/steady";
 import { preloadRoom, useLevel, useRoom } from "./useLevel";
 
 export type BoxCollider = {
@@ -153,6 +154,13 @@ export function Room() {
     if (showW !== shown.current.W) for (const o of rows.W) o.visible = showW;
     shown.current = { E: showE, W: showW };
   });
+
+  // Street shimmer (graffiti, gate stripes, mortar) pops in and out when the camera moves: sample the colour maps a touch softer.
+  // (?raw keeps the model's own sampling, for comparing.)
+  useLayoutEffect(() => {
+    if (level.lighting !== "street" || new URLSearchParams(window.location.search).has("raw")) return;
+    steadyTextures(scene);
+  }, [scene, level]);
 
   // The street's far ends: nodes flagged `haze` in the model fade into white.
   useLayoutEffect(() => {

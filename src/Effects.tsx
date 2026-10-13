@@ -1,9 +1,10 @@
 "use client";
 
-import { Bloom, EffectComposer, N8AO, ToneMapping } from "@react-three/postprocessing";
+import { Bloom, EffectComposer, N8AO, SMAA, ToneMapping } from "@react-three/postprocessing";
 import { ToneMappingMode } from "postprocessing";
 import { BLOOM } from "./config";
 import { useIsTouch } from "./Hud";
+import { useLevel } from "./useLevel";
 
 /**
  * Bloom for the coins and glints (prompt 2.7), off on phones. The composer turns the
@@ -16,13 +17,18 @@ import { useIsTouch } from "./Hud";
  */
 export function Effects() {
   const touch = useIsTouch();
+  const level = useLevel();
   if (touch) return null;
+  // A street is full of thin bars and rails that crawl when the camera moves; SMAA on top of the multisampling smooths them
+  // (the sub-pixel jitter test dropped the flickering edge pixels by about a fifth). ?raw leaves it out, for comparing.
+  const smaa = level.lighting === "street" && !new URLSearchParams(window.location.search).has("raw");
   return (
     <EffectComposer multisampling={4}>
       {/* Contact shading where things meet (couch/floor, corners, Hue's feet) grounds the room. */}
       <N8AO aoRadius={0.22} distanceFalloff={0.6} intensity={2.2} quality="medium" halfRes color="#1a120a" />
       <Bloom luminanceThreshold={BLOOM.threshold} luminanceSmoothing={0.1} intensity={BLOOM.intensity} mipmapBlur />
       <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
+      {smaa ? <SMAA /> : <></>}
     </EffectComposer>
   );
 }
