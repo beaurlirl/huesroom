@@ -158,16 +158,19 @@ function prepareTopOut(clip: THREE.AnimationClip, metresPerUnit: number): TopOut
   const up = new Float32Array(n);
   const fwd0 = v[FWD];
   const up0 = v[UP];
-  for (let k = 0; k < v.length / 3; k++) {
-    const i = k * 3;
+  // The Hips stay a fixed little way behind the root for the whole clip. (This used the frame index in place of the scale once,
+  // which dragged the body 0.02 m further back on every frame, about 2 m by the end, then snapped it to the root.)
+  const hipsBack = (CLIMB.topOutHipsBack * k) / metresPerUnit;
+  for (let j = 0; j < v.length / 3; j++) {
+    const i = j * 3;
     const riseK = -(v[i + UP] - up0) * metresPerUnit;
     const prog = rise > 0 ? Math.min(1, riseK / rise) : 0;
-    if (k < n) {
-      fwd[k] = (v[i + FWD] - fwd0) * metresPerUnit;
-      up[k] = riseK - (f1 - f0) * prog; // the root ends on the deck: the hips-to-foot difference is carried by the Hips instead
+    if (j < n) {
+      fwd[j] = (v[i + FWD] - fwd0) * metresPerUnit;
+      up[j] = riseK - (f1 - f0) * prog; // the root ends on the deck: the hips-to-foot difference is carried by the Hips instead
     }
     // The Hips keep their start offset above the root (plus that same difference as the clip goes on), and no path.
-    v[i + FWD] = (-0.02 * k) / metresPerUnit;
+    v[i + FWD] = -hipsBack;
     v[i + SIDE] = 0;
     v[i + UP] = -(f0 + (f1 - f0) * prog) / metresPerUnit;
   }

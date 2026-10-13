@@ -124,6 +124,8 @@ export const CLIMB = {
   topOutSpeed: 1.8,
   topOutEnd: 3.3,
   topOutFootBelowHips: [0.159, 0.185] as const,
+  /** How far behind the root (away from the wall) the Hips sit during `climb_top`, at full size (m): the body's distance from the rungs. Constant for the whole clip. */
+  topOutHipsBack: 0.02,
   ladderExitMargin: 0.08,
   ladderExitTime: 0.4,
   ladderBottomStep: 0.1,
