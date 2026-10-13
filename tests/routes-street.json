@@ -148,72 +148,60 @@
   "settle": 1500
  },
  {
-  "name": "85 flight 1: platform 1 -> 2 (2.80)",
+  "name": "85 ladder 1: platform 1 -> 2 (2.80)",
   "start": [
-   -3.72,
+   -3.82,
    1.95,
-   -1.7,
+   -1.73,
    180
   ],
   "steps": [
    {
-    "z": 1,
-    "ms": 450
-   },
-   {
-    "x": -1,
-    "ms": 2800
+    "z": -1,
+    "ms": 12000
    }
   ],
   "expectY": 2.8,
-  "expectPeak": 2.8
+  "settle": 1500
  },
  {
-  "name": "85 flight 2: platform 2 -> 3 (3.65)",
+  "name": "85 ladder 2: platform 2 -> 3 (3.65)",
   "start": [
-   -5.2,
+   -5.1,
    2.8,
-   -1.7,
-   0
-  ],
-  "steps": [
-   {
-    "z": 1,
-    "ms": 450
-   },
-   {
-    "x": 1,
-    "ms": 2800
-   }
-  ],
-  "expectY": 3.65,
-  "expectPeak": 3.65
- },
- {
-  "name": "85 flight 3: platform 3 -> 4 (4.50)",
-  "start": [
-   -3.72,
-   3.65,
-   -1.7,
+   -1.73,
    180
   ],
   "steps": [
    {
-    "z": 1,
-    "ms": 450
-   },
+    "z": -1,
+    "ms": 12000
+   }
+  ],
+  "expectY": 3.65,
+  "settle": 1500
+ },
+ {
+  "name": "85 ladder 3: platform 3 -> 4 (4.50)",
+  "start": [
+   -3.82,
+   3.65,
+   -1.73,
+   180
+  ],
+  "steps": [
    {
-    "x": -1,
-    "ms": 2800
+    "z": -1,
+    "ms": 12000
    }
   ],
   "expectY": 4.5,
-  "expectPeak": 4.5
+  "settle": 1500
  },
  {
   "name": "85 roof ladder: top platform -> roof (4.95)",
   "start": [
-   -3.82,
+   -5.1,
    4.5,
    -1.73,
    180
@@ -225,6 +213,57 @@
    }
   ],
   "expectY": 4.95,
+  "settle": 1500
+ },
+ {
+  "name": "87 ladder 1: platform 1 -> 2 (2.89)",
+  "start": [
+   -1.49,
+   1.8,
+   -1.73,
+   180
+  ],
+  "steps": [
+   {
+    "z": -1,
+    "ms": 12000
+   }
+  ],
+  "expectY": 2.89,
+  "settle": 1500
+ },
+ {
+  "name": "87 ladder 2: platform 2 -> 3 (3.74)",
+  "start": [
+   -2.21,
+   2.89,
+   -1.73,
+   180
+  ],
+  "steps": [
+   {
+    "z": -1,
+    "ms": 12000
+   }
+  ],
+  "expectY": 3.74,
+  "settle": 1500
+ },
+ {
+  "name": "87 roof ladder: platform 3 -> roof (4.80)",
+  "start": [
+   -1.49,
+   3.74,
+   -1.73,
+   180
+  ],
+  "steps": [
+   {
+    "z": -1,
+    "ms": 12000
+   }
+  ],
+  "expectY": 4.8,
   "settle": 1500
  },
  {
