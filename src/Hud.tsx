@@ -220,6 +220,7 @@ export function WinPanel({ share }: { share?: React.ReactNode }) {
             <span className="flex-1" />
             <AudioSwitches />
           </div>
+          {level.credit && <span className="ui-label opacity-60" style={{ animation: GLASS.in(0.8, t * 3) }}>{level.credit}</span>}
         </div>
       )}
     </Veil>

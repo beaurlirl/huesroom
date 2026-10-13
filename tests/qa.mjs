@@ -157,7 +157,7 @@ check('win freezes timer and input', (await state()).elapsed === frozen.elapsed 
 // The outro holds the title on the glass before the results settle in.
 check('win panel shows', await page.getByRole('button', { name: 'Play again' }).waitFor({ timeout: 8000 }).then(() => true, () => false));
 // The win line is "hue made it outside"; nothing leaves the page and nothing is left behind in storage or cookies.
-check('win panel says hue made it outside, come back soon', (await page.getByText('hue made it outside').first().isVisible()) && (await page.getByText('come back soon for his next move').isVisible()));
+check('win panel says hue made it outside and offers the next location', (await page.getByText('hue made it outside').first().isVisible()) && (await page.getByText(/location 02/).first().isVisible()) && (await page.getByRole('button', { name: /next location/i }).isVisible()));
 const leaks = await page.evaluate(() => ({
   links: [...document.querySelectorAll('a[href]')].filter((a) => new URL(a.href, location.href).origin !== location.origin).length,
   unlocked: localStorage.getItem('hue.unlocked') !== null || document.cookie.includes('hue_unlocked'),

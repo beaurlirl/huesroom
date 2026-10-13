@@ -47,6 +47,8 @@ export type LevelDef = {
   haze?: { xMin: number; xMax: number; span: number };
   /** false = not released yet: reachable only with ?level=<id>, never offered as the next level. */
   live: boolean;
+  /** Attribution shown (as plain text, no link) on the win screen. */
+  credit?: string;
 };
 
 /** In release order. The first entry is the default and the fallback for an unknown `?level=`. */
@@ -88,7 +90,8 @@ export const LEVELS: readonly LevelDef[] = [
     },
     par: { fast: 60, slow: 180, bonusMax: 40 },
     haze: { xMin: -15, xMax: 8.5, span: 5.5 },
-    live: false,
+    credit: "street layout from map data © OpenStreetMap contributors",
+    live: true,
   },
 ];
 

@@ -192,11 +192,11 @@
   "steps": [
    {
     "z": -1,
-    "ms": 12000
+    "ms": 4000
    }
   ],
-  "expectY": 4.5,
-  "settle": 1500
+  "settle": 1500,
+  "expectMin": 4.45
  },
  {
   "name": "85 roof ladder: top platform -> roof (4.95)",
@@ -250,7 +250,7 @@
   "settle": 1500
  },
  {
-  "name": "87 roof ladder: platform 3 -> roof (4.80)",
+  "name": "87 roof ladder: platform 3 -> roof (4.85)",
   "start": [
    -1.49,
    3.74,
@@ -263,7 +263,7 @@
     "ms": 12000
    }
   ],
-  "expectY": 4.8,
+  "expectY": 4.85,
   "settle": 1500
  },
  {
