@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { playedBeforeAtLoad } from "../seen";
 import { useGame } from "../store";
 import { playSfx, prepareAudio, setMusicPaused, startMusic, unlockAudio } from "./sfx";
 
@@ -18,7 +19,7 @@ export function AudioDirector() {
     // Build the audio engine and the music player behind the title card, so the begin press only has to press play.
     let prep: ReturnType<typeof setTimeout> | undefined;
     const schedulePrepare = (phase: string) => {
-      if (prep === undefined && (phase === "intro" || phase === "ready")) prep = setTimeout(prepareAudio, phase === "ready" ? 0 : 2200); // 2.2 s: the title card has finished fading in and is holding still
+      if (prep === undefined && (phase === "intro" || phase === "ready")) prep = setTimeout(prepareAudio, phase === "ready" ? 0 : playedBeforeAtLoad() ? 950 : 2200); // while the title card holds still: 2.2 s on the full card, 0.95 s on the quick one
     };
     schedulePrepare(useGame.getState().phase);
     const unsub = useGame.subscribe((s, prev) => {

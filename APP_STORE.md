@@ -16,7 +16,7 @@ What the build does and does not do, which is what App Review and the privacy la
 
 - Everything it needs is inside `out/`: room, Hue, clips, Draco decoder, fonts, music. No CDN, no
   API calls, no analytics, no accounts. Offline works.
-- Stores on the device only: best time and mute settings (`localStorage`). No cookies.
+- Stores on the device only: best times, the coin ledger, mute settings and a "has started the game before" flag that gives returning players the shorter title card (`localStorage`). No cookies.
 - No outbound links: the win screen ends on "hue made it outside" and the game never leaves the page.
 - No AI or chat in the launch build; Hue is silent. (AI Hue is planned for later and will change the privacy label.)
 - Pauses and silences audio when the app goes to the background; it stays paused until the player resumes.

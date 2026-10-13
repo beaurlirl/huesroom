@@ -291,6 +291,17 @@ export const INTRO = {
   credit: "A game developed by Gest in Lower Manhattan",
 };
 
+/** The same card for players who have started the game on this device before: it shows the title and gets out of the way (seen.ts). */
+export const INTRO_QUICK = {
+  titleIn: 0.7,
+  creditDelay: 0.3,
+  creditIn: 0.6,
+  titleOut: 0.5,
+  cardHold: 1.4,
+  fadeFromWhite: 0.9,
+  credit: INTRO.credit,
+};
+
 /** Win: title on the fogged glass, then the results (seconds). */
 export const OUTRO = {
   /** How long "hue leaves home" holds before the results settle in. */

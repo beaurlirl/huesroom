@@ -7,6 +7,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { AssetGate } from "./AssetGate";
 import { AudioDirector } from "./audio/AudioDirector";
+import { NextLevelPrefetch } from "./NextLevelPrefetch";
 import { listedClips, loadedClips, musicPlaying } from "./audio/sfx";
 import { bookBodies, Books } from "./Books";
 import { pushableBodies } from "./pushables";
@@ -206,6 +207,7 @@ export default function Game() {
         {debug && <Stats />}
       </Canvas>
       <AudioDirector />
+      <NextLevelPrefetch />
       <GamepadDirector />
       <TouchControls />
       <Hud share={<ShareButton />} />

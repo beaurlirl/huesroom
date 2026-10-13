@@ -1,12 +1,15 @@
 "use client";
 
 import { useProgress } from "@react-three/drei";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { useIsTouch } from "../Hud";
-import { INTRO } from "../config";
+import { INTRO, INTRO_QUICK } from "../config";
+import { markPlayed, playedBeforeAtLoad } from "../seen";
 import { RESET_FADE_MS, useGame } from "../store";
 import { Frost, GLASS } from "./Frost";
 import { theme } from "./theme";
+
+const subscribeNever = () => () => {};
 
 /** Loading screen → fade from white with the title → `begin` prompt. */
 export function Overlay() {
@@ -17,6 +20,12 @@ export function Overlay() {
   const runId = useGame((s) => s.runId);
   const sceneReady = useGame((s) => s.sceneReady);
   const [pad, setPad] = useState(false);
+  // Returning players (started the game on this device before) get the quick title card; first-timers see the whole thing.
+  const returning = useSyncExternalStore(subscribeNever, playedBeforeAtLoad, () => false);
+  const T = returning ? INTRO_QUICK : INTRO;
+  useEffect(() => {
+    if (phase === "playing") markPlayed();
+  }, [phase]);
   useEffect(() => {
     // Browsers only report a pad after its first button press, so poll as well as listen.
     const check = () => setPad(Array.from(navigator.getGamepads?.() ?? []).some((g) => g?.connected));
@@ -35,20 +44,20 @@ export function Overlay() {
   const [cardDone, setCardDone] = useState(false);
   useEffect(() => {
     if (phase !== "intro") return;
-    const hold = runId === 0 ? INTRO.cardHold : 0;
+    const hold = runId === 0 ? T.cardHold : 0;
     const t = setTimeout(() => setCardDone(true), hold * 1000);
     return () => {
       clearTimeout(t);
       setCardDone(false);
     };
-  }, [phase, runId]);
+  }, [phase, runId, T.cardHold]);
   // Fading out to Hue on the chair.
   const leavingCard = phase === "intro" && cardDone && sceneReady;
   useEffect(() => {
     if (!leavingCard) return;
-    const ready = setTimeout(() => setPhase("ready"), INTRO.fadeFromWhite * 1000);
+    const ready = setTimeout(() => setPhase("ready"), T.fadeFromWhite * 1000);
     return () => clearTimeout(ready);
-  }, [leavingCard, setPhase]);
+  }, [leavingCard, setPhase, T.fadeFromWhite]);
 
   // Any key / tap begins.
   useEffect(() => {
@@ -76,7 +85,7 @@ export function Overlay() {
           A restart fogs back over to white before the room resets behind it. */}
       <Frost
         level={white ? "white" : "clear"}
-        ms={phase === "resetting" ? RESET_FADE_MS : INTRO.fadeFromWhite * 1000}
+        ms={phase === "resetting" ? RESET_FADE_MS : T.fadeFromWhite * 1000}
         className="absolute inset-0 flex flex-col items-center justify-center"
       >
         {/* Title card: condenses out of the white, then dissolves as the glass clears. */}
@@ -84,7 +93,7 @@ export function Overlay() {
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 px-6 text-center">
             <h1
               className="text-5xl font-bold leading-[0.9] sm:text-7xl md:text-8xl"
-              style={{ animation: leavingCard ? GLASS.out(INTRO.titleOut) : GLASS.in(INTRO.titleIn) }}
+              style={{ animation: leavingCard ? GLASS.out(T.titleOut) : GLASS.in(T.titleIn) }}
             >
               {theme.wordmark}
             </h1>
@@ -92,11 +101,11 @@ export function Overlay() {
               className="flex items-center gap-3 text-sm sm:text-base"
               style={{
                 color: theme.muted,
-                animation: leavingCard ? GLASS.out(INTRO.titleOut, 0.08) : GLASS.in(INTRO.creditIn, INTRO.creditDelay),
+                animation: leavingCard ? GLASS.out(T.titleOut, 0.08) : GLASS.in(T.creditIn, T.creditDelay),
               }}
             >
               <span className="ui-rule hidden w-10 sm:block" />
-              <span>{INTRO.credit}</span>
+              <span>{T.credit}</span>
               <span className="ui-rule hidden w-10 sm:block" />
             </div>
           </div>

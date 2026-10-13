@@ -12,6 +12,10 @@ page.on('console', (m) => { if (m.type() === 'error') errors.push('console: ' + 
 page.on('requestfailed', (r) => { if (!/ERR_ABORTED/.test(r.failure()?.errorText ?? '')) errors.push('requestfailed: ' + r.url() + ' ' + r.failure()?.errorText); }); // streamed music is cut off on reload: not an error
 page.on('response', (r) => { if (r.status() >= 400) errors.push(`HTTP ${r.status()}: ${r.url()}`); });
 
+// Time from navigation to the begin prompt, on every load of this page (first visit vs a returning player).
+await page.addInitScript(() => {
+  const iv = setInterval(() => { if (window.__hue?.useGame.getState().phase === 'ready') { window.__readyAt = performance.now(); clearInterval(iv); } }, 20);
+});
 await page.goto(URL);
 await page.waitForFunction(() => { const g = window.__hue?.useGame.getState(); return g?.phase === 'intro' && g.sceneReady; }, null, { timeout: 60000 });
 
@@ -46,6 +50,8 @@ let s1 = await state();
 check('no movement during intro', JSON.stringify(s0.feet) === JSON.stringify(s1.feet) && s1.phase !== 'playing', `phase ${s1.phase}`);
 await page.waitForFunction(() => window.__hue.useGame.getState().phase === 'ready', null, { timeout: 10000 });
 check('title → begin prompt', (await page.getByText('press any key').isVisible()));
+await page.waitForFunction(() => window.__readyAt !== undefined, null, { timeout: 2000 });
+const tFirst = await page.evaluate(() => window.__readyAt);
 
 // 2. Begin → rise (locked) → control; timer starts then.
 await page.keyboard.press('Space');
@@ -156,6 +162,8 @@ const frozen = await state(); await page.waitForTimeout(500);
 check('win freezes timer and input', (await state()).elapsed === frozen.elapsed && frozen.phase === 'won');
 // The outro holds the title on the glass before the results settle in.
 check('win panel shows', await page.getByRole('button', { name: 'Play again' }).waitFor({ timeout: 8000 }).then(() => true, () => false));
+// The next level's model downloads in the background the moment the level is won, so the jump to it is quick.
+check('next level model is fetched in the background', await page.waitForFunction(() => performance.getEntriesByType('resource').some((e) => e.name.includes('/levels/street/room.glb')), null, { timeout: 15000 }).then(() => true, () => false));
 // The win line is "hue made it outside"; nothing leaves the page and nothing is left behind in storage or cookies.
 check('win panel says hue made it outside and offers the next location', (await page.getByText('hue made it outside').first().isVisible()) && (await page.getByText(/location 02/).first().isVisible()) && (await page.getByRole('button', { name: /next location/i }).isVisible()));
 const leaks = await page.evaluate(() => ({
@@ -173,6 +181,10 @@ await page.reload();
 await page.waitForFunction(() => window.__hue?.useGame.getState().phase === 'ready', null, { timeout: 60000 });
 const best = await page.evaluate(() => localStorage.getItem('huesroom.best'));
 check('best time persists across reload', Math.abs(Number(best) - w1.time) < 1e-6, `stored ${best}`);
+// Having started the game, this device now gets the quick title card.
+await page.waitForFunction(() => window.__readyAt !== undefined, null, { timeout: 2000 });
+const tQuick = await page.evaluate(() => window.__readyAt);
+check("a returning player's title card is shorter", tQuick <= tFirst - 1500, `first visit ${(tFirst / 1000).toFixed(1)} s, returning ${(tQuick / 1000).toFixed(1)} s`);
 check('no touch controls on desktop', (await page.getByRole('button', { name: 'Jump' }).count()) === 0);
 
 await ctx.close();
