@@ -86,23 +86,36 @@ async function loadClip(name: string, base: string) {
 export const loadedClips = () => [...buffers.keys()];
 export const listedClips = () => Object.keys(AUDIO_FILES);
 
+/** Builds the audio context and its two buses (suspended: browsers only let it run after a gesture). */
+function ensureContext() {
+  if (ctx) return true;
+  const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+  if (!AC) return false;
+  ctx = new AC();
+  sfxBus = ctx.createGain();
+  musicBus = ctx.createGain();
+  sfxBus.connect(ctx.destination);
+  musicBus.connect(ctx.destination);
+  applyMute();
+  for (const [name, base] of Object.entries(AUDIO_FILES)) if (base) void loadClip(name, base);
+  return true;
+}
+
+/**
+ * Builds the audio context and the music player ahead of the first gesture, while the title card is up. Doing it inside the
+ * begin press cost about 130 ms in that one frame (a visible hitch as the game starts). Nothing plays until a gesture.
+ */
+export function prepareAudio() {
+  if (typeof window === "undefined") return;
+  if (ensureContext()) prepareTrack();
+}
+
 /**
  * Creates/resumes the audio context. Call from a user gesture (the begin press). With
  * `resume = false` it only creates it (e.g. a tap while paused shouldn't restart the music).
  */
 export function unlockAudio(resume = true) {
-  if (typeof window === "undefined") return;
-  if (!ctx) {
-    const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    if (!AC) return;
-    ctx = new AC();
-    sfxBus = ctx.createGain();
-    musicBus = ctx.createGain();
-    sfxBus.connect(ctx.destination);
-    musicBus.connect(ctx.destination);
-    applyMute();
-    for (const [name, base] of Object.entries(AUDIO_FILES)) if (base) void loadClip(name, base);
-  }
+  if (typeof window === "undefined" || !ensureContext() || !ctx) return;
   // iOS Safari can also report "interrupted" (calls, app switches), not just "suspended".
   if (resume && ctx.state !== "running") void ctx.resume();
 }
@@ -240,15 +253,17 @@ function scheduleBar(t: number, notes: number[]) {
 }
 
 let musicEl: HTMLAudioElement | null = null;
+/** The music element once built (by prepareAudio, or on the first start): wired to the music bus, not necessarily playing. */
+let trackEl: HTMLAudioElement | null = null;
 let track = 0;
 
-/** Streams the playlist through the music bus (so mute/volume apply); synth pad if it fails. */
-function startTrack() {
+function prepareTrack() {
+  if (trackEl) return true;
   if (!ctx || !musicBus) return false;
   const el = new Audio();
   const ext = el.canPlayType('audio/ogg; codecs="opus"') ? "ogg" : "mp3";
   el.src = `${PLAYLIST[track % PLAYLIST.length]}.${ext}`;
-  el.preload = "auto";
+  el.preload = "metadata"; // just the header while the level loads; the full track streams once it plays (startTrack)
   try {
     ctx.createMediaElementSource(el).connect(musicBus);
   } catch {
@@ -264,6 +279,15 @@ function startTrack() {
     musicEl = null;
     startPad();
   });
+  trackEl = el;
+  return true;
+}
+
+/** Streams the playlist through the music bus (so mute/volume apply); synth pad if it fails. */
+function startTrack() {
+  if (!prepareTrack() || !trackEl) return false;
+  const el = trackEl;
+  el.preload = "auto";
   void el.play().catch(() => {
     // Autoplay refused (no gesture yet): the next unlock gesture retries.
     musicEl = null;
