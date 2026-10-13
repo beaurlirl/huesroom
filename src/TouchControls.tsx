@@ -38,13 +38,16 @@ export function TouchControls() {
           pointerEvents: visible ? "auto" : "none",
         }}
       >
-        {/* Glass disc behind the stick (the library draws its own base on top). */}
-        <div className="glass pointer-events-none absolute inset-0 rounded-full" />
+        {/* A small blurred circle outline behind the stick (the library draws its own base on top). */}
+        <div
+          className="pointer-events-none absolute inset-0 rounded-full"
+          style={{ border: "1px solid rgba(10, 10, 10, 0.4)", background: "rgba(255, 255, 255, 0.18)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)" }}
+        />
         <Joystick
           size={116}
           stickSize={52}
-          baseColor="rgba(0, 71, 255, 0.22)"
-          stickColor="rgba(255, 255, 255, 0.92)"
+          baseColor="rgba(0, 0, 0, 0)"
+          stickColor="#0a0a0a"
           throttle={16}
           move={(e) =>
             useTouchInput.setState({ moveX: e.x ?? 0, moveZ: e.y ?? 0, run: (e.distance ?? 0) > RUN_DISTANCE })
@@ -61,8 +64,8 @@ export function TouchControls() {
           bottom: "calc(44px + env(safe-area-inset-bottom))",
           width: 72,
           height: 72,
-          background: jumpDown ? theme.blue : undefined,
-          color: theme.paper,
+          background: jumpDown ? theme.ink : undefined,
+          color: jumpDown ? theme.paper : theme.ink,
           transform: jumpDown ? "scale(0.92)" : "scale(1)",
           transition: "transform 0.08s, background 0.08s",
           pointerEvents: visible ? "auto" : "none",

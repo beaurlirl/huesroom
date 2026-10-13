@@ -6,6 +6,8 @@ import { OUTRO } from "./config";
 import { formatTime, runtime, useGame } from "./store";
 import { Frost, GLASS, useFrostPresence } from "./ui/Frost";
 import { theme } from "./ui/theme";
+import type { Reward } from "./economy";
+import { nextLevel } from "./levels";
 import { useLevel } from "./useLevel";
 
 const COARSE = "(pointer: coarse)";
@@ -38,7 +40,7 @@ function Timer() {
   return <span ref={ref}>0:00.0</span>;
 }
 
-/** A blue-glass plate with a small label over a bold figure (directory's label/title pairs). */
+/** A white-glass plate with a small label over a bold figure (directory's label/title pairs). */
 function Plate({ label, children, align = "left" }: { label: string; children: React.ReactNode; align?: "left" | "right" }) {
   return (
     <div className={`glass flex min-w-[92px] flex-col gap-1.5 px-3.5 py-2.5 ${align === "right" ? "items-end" : ""}`}>
@@ -115,13 +117,36 @@ function Veil({ open, ms, right, children }: { open: boolean; ms: number; right:
 /** How the level ends: Hue got outside, and you found every coin. */
 function MadeItCard({ delay }: { delay: number }) {
   const total = useGame((s) => s.totalCoins);
+  const level = useLevel();
   return (
     <div className="flex w-full flex-col gap-4 p-5 sm:p-6" style={{ background: theme.paper, color: theme.ink, border: `1px solid ${theme.ink}`, animation: GLASS.in(0.9, delay) }}>
       <div className="ui-label flex items-center gap-2" style={{ opacity: 1 }}>
         <span className="inline-block h-1.5 w-1.5" style={{ background: theme.ink }} />
         all {total} coins
       </div>
-      <div className="text-4xl font-bold leading-[0.95] sm:text-5xl">{theme.madeIt}</div>
+      <div className="text-4xl font-bold leading-[0.95] sm:text-5xl">{level.winLine}</div>
+    </div>
+  );
+}
+
+/** What the run paid: coins for the level (first time only), a speed bonus, and the new balance. */
+function Earnings({ reward, wallet, delay }: { reward: Reward; wallet: number; delay: number }) {
+  const rows: [string, number][] = [["coins collected", reward.base], ["speed bonus", reward.bonus]];
+  return (
+    <div className="flex flex-col gap-1.5 text-sm" style={{ animation: GLASS.in(0.8, delay * 1.5) }}>
+      {rows.map(([label, n]) => (
+        <div key={label} className="flex items-baseline gap-3">
+          <span className="ui-label">{label}</span>
+          <span className="ui-rule flex-1" />
+          <span className="tabular-nums">{n > 0 ? `+${n}` : "-"}</span>
+        </div>
+      ))}
+      <div className="flex items-baseline gap-3 font-bold">
+        <span className="ui-label">total coins</span>
+        <span className="ui-rule flex-1" />
+        <span className="tabular-nums">{wallet}</span>
+      </div>
+      <span className="text-xs" style={{ color: theme.muted }}>coins stay on this device</span>
     </div>
   );
 }
@@ -134,6 +159,7 @@ export function WinPanel({ share }: { share?: React.ReactNode }) {
   const phase = useGame((s) => s.phase);
   const result = useGame((s) => s.result);
   const restart = useGame((s) => s.restart);
+  const goToLevel = useGame((s) => s.goToLevel);
   const total = useGame((s) => s.totalCoins);
   const level = useLevel();
   // The result outlives the "won" phase while the glass clears on a restart.
@@ -150,6 +176,7 @@ export function WinPanel({ share }: { share?: React.ReactNode }) {
     return () => timers.forEach(clearTimeout);
   }, [phase]);
   const r = result ?? shownResult;
+  const upNext = nextLevel(level.id);
   if (!r) return null;
   const t = OUTRO.stagger;
   return (
@@ -179,13 +206,15 @@ export function WinPanel({ share }: { share?: React.ReactNode }) {
             <span className="text-sm">{r.isBest ? "new best time" : `best ${formatTime(r.best)}`}</span>
           </div>
           <MadeItCard delay={t} />
+          <Earnings reward={r.reward} wallet={r.wallet} delay={t} />
           {/* Where he goes next: this room is stop one of Hue's journey (user request). */}
           <div className="flex items-start gap-3" style={{ animation: GLASS.in(0.8, t * 2) }}>
             <span className="ui-label mt-0.5 whitespace-nowrap">next</span>
             <span className="ui-rule mt-1.5 w-8 shrink-0" />
-            <span className="text-sm leading-snug">come back soon for his next move</span>
+            <span className="text-sm leading-snug">{upNext ? `location ${pad2(upNext.number)} · ${upNext.name}` : "come back soon for his next move"}</span>
           </div>
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2" style={{ animation: GLASS.in(0.8, t * 3) }}>
+            {upNext && <Btn onClick={() => goToLevel(upNext.id)}>next location</Btn>}
             <Btn onClick={restart}>play again</Btn>
             {share}
             <span className="flex-1" />

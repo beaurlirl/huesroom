@@ -40,12 +40,16 @@ export function Hue() {
   const gltf = useGLTF(ASSETS.hue, ASSETS.draco);
   const animGltfs = useGLTF(CLIP_NAMES.map(ASSETS.anim));
   const spawn = useSpawn();
+  const level = useLevel();
   const phase = useGame((s) => s.phase);
 
   const root = gltf.scene.children[0]; // "Hue | 0.4572m placement"
   const armature = root.children[0];
 
-  const { clips, seatedRootOffset, rollCurve, climbRiseSpeed } = useMemo(() => {
+  const { clips, seatedRootOffset, rollCurve, climbRiseSpeed, topOut } = useMemo(() => {
+    // Drawn smaller than the model's native 0.457 m by HUE.visualScale (set from the native scale so a re-run never shrinks twice).
+    root.userData.baseScale ??= root.scale.x;
+    root.scale.setScalar((root.userData.baseScale as number) * HUE.visualScale);
     const raw = {} as Record<ClipName, THREE.AnimationClip>;
     CLIP_NAMES.forEach((name, i) => (raw[name] = animGltfs[i].animations[0]));
     return prepareClips(raw, root.scale.x * armature.scale.x);
@@ -55,7 +59,7 @@ export function Hue() {
   const actions = useMemo(() => {
     const out = {} as Record<ClipName, THREE.AnimationAction>;
     for (const name of CLIP_NAMES) out[name] = mixer.clipAction(clips[name]);
-    for (const name of ["sit_to_stand", "jump", "jump_down", "jump_down_2", "fall_roll"] as const) {
+    for (const name of ["sit_to_stand", "jump", "jump_down", "jump_down_2", "fall_roll", "climb_top"] as const) {
       out[name].setLoop(THREE.LoopOnce, 1);
       out[name].clampWhenFinished = true;
     }
@@ -67,9 +71,13 @@ export function Hue() {
     [seatedRootOffset, spawn],
   );
 
+  // Where he stands when the run starts: on the chair, or (a street) already on his feet at the spawn.
+  const startFeet = level.start === "chair" ? seatedFeet : spawn.feet;
+  const startClip = level.start === "chair" ? "sit" : "idle";
+
   const bodyRef = useRef<RapierRigidBody>(null);
   const colliderRef = useRef<RapierCollider>(null);
-  const controller = useHueController(bodyRef, colliderRef, anim, rollCurve, climbRiseSpeed);
+  const controller = useHueController(bodyRef, colliderRef, anim, rollCurve, climbRiseSpeed, topOut);
 
   // First visible frame: a clip is bound, playing and evaluated, and the root is placed.
   useLayoutEffect(() => {
@@ -83,45 +91,53 @@ export function Hue() {
       }
     });
 
-    root.position.copy(seatedFeet);
+    root.position.copy(startFeet);
     root.rotation.set(0, spawn.yaw, 0);
-    runtime.feet.copy(seatedFeet);
+    runtime.feet.copy(startFeet);
+    runtime.startFeet.copy(startFeet);
     runtime.grounded = true;
 
-    anim.snap("sit");
+    anim.snap(startClip);
     gltf.scene.visible = true;
     initInput();
     runtime.hueReady = true;
     return () => {
       runtime.hueReady = false;
     };
-  }, [gltf.scene, root, anim, spawn, seatedFeet]);
+  }, [gltf.scene, root, anim, spawn, startFeet, startClip]);
 
   // Rise on begin; hand over control when sit_to_stand finishes.
   useEffect(() => {
     if (phase !== "rising") return;
+    if (level.start === "stand") {
+      // A street has no chair to rise from: he is already standing, so play begins at once.
+      anim.play("idle");
+      controller.get()?.place(startFeet, spawn.yaw);
+      useGame.getState().setPhase("playing");
+      return;
+    }
     anim.play("sit_to_stand");
     const onFinished = (e: { action: THREE.AnimationAction }) => {
       if (e.action !== actions.sit_to_stand) return;
       anim.play("idle");
-      controller.get()?.place(seatedFeet, spawn.yaw);
+      controller.get()?.place(startFeet, spawn.yaw);
       useGame.getState().setPhase("playing");
     };
     mixer.addEventListener("finished", onFinished);
     return () => mixer.removeEventListener("finished", onFinished);
-  }, [phase, mixer, actions, anim, controller, seatedFeet, spawn]);
+  }, [phase, mixer, actions, anim, controller, startFeet, spawn, level]);
 
   // Restart: back on the chair, seated, capsule out of the way of the books.
   const runId = useGame((s) => s.runId);
   useEffect(() => {
     if (runId === 0) return;
-    controller.get()?.place(seatedFeet, spawn.yaw);
-    root.position.copy(seatedFeet);
+    controller.get()?.place(startFeet, spawn.yaw);
+    root.position.copy(startFeet);
     root.rotation.set(0, spawn.yaw, 0);
-    runtime.feet.copy(seatedFeet);
+    runtime.feet.copy(startFeet);
     runtime.grounded = true;
-    anim.snap("sit");
-  }, [runId, controller, seatedFeet, spawn, root, anim]);
+    anim.snap(startClip);
+  }, [runId, controller, startFeet, startClip, spawn, root, anim]);
 
   // ?debug: jump Hue anywhere (feet position, facing in degrees; 0 = +X, 90 = toward -Z).
   useEffect(() => {
@@ -162,7 +178,7 @@ export function Hue() {
         ref={bodyRef}
         type="kinematicPosition"
         colliders={false}
-        position={[seatedFeet.x, seatedFeet.y + HUE.capsuleHalfHeight + HUE.capsuleRadius, seatedFeet.z]}
+        position={[startFeet.x, startFeet.y + HUE.capsuleHalfHeight + HUE.capsuleRadius, startFeet.z]}
         enabledRotations={[false, false, false]}
       >
         <CapsuleCollider ref={colliderRef} args={[HUE.capsuleHalfHeight, HUE.capsuleRadius]} />

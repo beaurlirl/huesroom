@@ -31,6 +31,7 @@ export const CLIP_NAMES = [
   "jump_down_2",
   "fall_roll",
   "climb_ladder",
+  "climb_top",
   "sit",
   "sit_to_stand",
 ] as const;
@@ -38,6 +39,11 @@ export type ClipName = (typeof CLIP_NAMES)[number];
 
 export const HUE = {
   height: 0.457,
+  /**
+   * How big he is drawn, 1 = the size the level geometry was built around (0.457 m). Below 1 he looks smaller in the world; the capsule, speeds, jumps and
+   * every route stay exactly as they are. Animation distances measured on the full-size model (hips to foot on the ladder) scale with it.
+   */
+  visualScale: 0.85,
   capsuleRadius: 0.06,
   capsuleHalfHeight: 0.17,
   crossfade: 0.15,
@@ -109,6 +115,15 @@ export const CLIMB = {
   overTime: 0.2,
   overlap: 0.06,
   ladderSpeed: 0.22,
+  /**
+   * Getting over the top of a ladder plays `climb_top` (Mixamo "Climbing To Top") instead of sliding onto the deck. Hue's root follows the
+   * clip's own hip path, so hands and feet stay on the rungs and then the deck. It starts when his feet are `topOutRise` below the deck
+   * (the clip's rise) and ends on it. `topOutSpeed` plays it faster than the 3.3 s original; `topOutEnd` is where the clip is cut (s).
+   * `topOutFootBelowHips` is the lowest foot's distance under the Hips at the clip's start and end (measured with scripts/clip-limbs.mjs).
+   */
+  topOutSpeed: 1.8,
+  topOutEnd: 3.3,
+  topOutFootBelowHips: [0.159, 0.185] as const,
   ladderExitMargin: 0.08,
   ladderExitTime: 0.4,
   ladderBottomStep: 0.1,
@@ -121,14 +136,22 @@ export const LANDING = {
   rollMin: 0.9,
   hopLock: 0.4,
   rollLock: 0.5,
+  /**
+   * Holding a direction as he lands: a drop up to `stepMax` is just a little step (no lock, `stepCarry` of his speed kept) and he walks
+   * straight on; a bigger hop only holds the controls `hopLockMoving` s and keeps `hopCarry` of his speed, instead of stopping dead for `hopLock`.
+   */
+  stepMax: 0.5,
+  stepCarry: 0.85,
+  hopLockMoving: 0.15,
+  hopCarry: 0.6,
 };
 
 /** Hand-picked moments inside the clips (seconds), from scripts/clip-timeline.mjs. */
 export const CLIP_TIMES = {
-  walkSpeedAtScale1: 0.24, // walk clip travels 0.39 m per 1.63 s loop
+  walkSpeedAtScale1: 0.24 * HUE.visualScale, // walk clip travels 0.39 m per 1.63 s loop at full size
   /** The jump clip's air section plays at this speed (0.6 before jumps were slowed 2x). */
   jumpClipScale: 0.69,
-  runTimeScale: 1.3,
+  runTimeScale: 1.3 / HUE.visualScale,
   jumpTakeoff: 0.55, // end of the crouch
   jumpAirHold: 0.88, // tucked, mid-air
   jumpLand: 1.05,
@@ -205,6 +228,9 @@ export const CAMERA = {
   smoothX: 0.4,
   smoothY: 0.5,
   smoothLook: 0.25,
+  /** Two-sided streets: seconds for the camera to swing to the other side, and the dead band (m) around the centre line. */
+  flipTime: 0.9,
+  flipDeadband: 0.12,
   /** While climbing a ledge the camera follows this much tighter (× smoothY / smoothLook), so the hop up never outruns it. */
   climbSmoothScale: 0.45,
   yawClamp: (55 * Math.PI) / 180,

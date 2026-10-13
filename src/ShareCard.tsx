@@ -6,6 +6,7 @@ import * as THREE from "three";
 import { BASE_PATH, CAMERA, HUE } from "./config";
 import { formatTime, runtime, useGame } from "./store";
 import { theme } from "./ui/theme";
+import { getLevel } from "./useLevel";
 
 // Share card layout (1080×1920, Instagram Story). Restyle here and in ui/theme.ts.
 const CARD = { w: 1080, h: 1920, photoH: 1300, pad: 64 };
@@ -155,7 +156,7 @@ export async function renderShareCard(time: number): Promise<Blob | null> {
   g.fillRect(0, h - bandH, w, bandH);
   g.fillStyle = theme.paper;
   g.font = font(700, 40);
-  g.fillText(up(theme.madeIt), pad, h - bandH / 2 + 15);
+  g.fillText(up(getLevel().winLine), pad, h - bandH / 2 + 15);
   const link = up(`${window.location.host}${BASE_PATH}`);
   g.font = font(400, 32);
   g.fillText(link, w - pad - g.measureText(link).width, h - bandH / 2 + 12);
@@ -164,7 +165,7 @@ export async function renderShareCard(time: number): Promise<Blob | null> {
 }
 
 export function shareCaption(time: number) {
-  return `i got all ${useGame.getState().totalCoins} coins in ${formatTime(time)} in ${theme.wordmark}: ${theme.madeIt} → ${window.location.origin}${BASE_PATH}`;
+  return `i got all ${useGame.getState().totalCoins} coins in ${formatTime(time)} in ${theme.wordmark}: ${getLevel().winLine} → ${window.location.origin}${BASE_PATH}`;
 }
 
 /** Win-panel Share button: phone share sheet (Instagram et al.), else download + copy caption. */

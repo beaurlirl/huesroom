@@ -1,6 +1,8 @@
 import * as THREE from "three";
 import { create } from "zustand";
-import { LEVELS, levelById } from "./levels";
+import type { Reward } from "./economy";
+import { applyRun, EMPTY_LEDGER, parseLedger, walletOf, type Ledger } from "./ledger";
+import { bestKey, LEDGER_KEY, LEVELS, levelById } from "./levels";
 
 export type Phase =
   | "loading" // assets streaming in
@@ -18,23 +20,47 @@ function initialLevelId() {
 }
 /** Restart: the room fogs over to white glass before it resets behind it. */
 export const RESET_FADE_MS = 650;
-const BEST_KEY = "huesroom.best";
 
-export function readBest(): number | null {
+export function readBest(levelId: string = useGame.getState().levelId): number | null {
   try {
-    const v = window.localStorage.getItem(BEST_KEY);
+    const v = window.localStorage.getItem(bestKey(levelId));
     return v ? Number(v) : null;
   } catch {
     return null;
   }
 }
 
-function writeBest(t: number) {
+function writeBest(levelId: string, t: number) {
   try {
-    window.localStorage.setItem(BEST_KEY, String(t));
+    window.localStorage.setItem(bestKey(levelId), String(t));
   } catch {
     // Storage blocked (private mode, etc.): the game works without it.
   }
+}
+
+export function readLedger(): Ledger {
+  try {
+    return parseLedger(JSON.parse(window.localStorage.getItem(LEDGER_KEY) ?? "null"));
+  } catch {
+    return EMPTY_LEDGER;
+  }
+}
+
+function writeLedger(l: Ledger) {
+  try {
+    window.localStorage.setItem(LEDGER_KEY, JSON.stringify(l));
+  } catch {
+    // Storage blocked: the run still shows what it earned, it just isn't kept.
+  }
+}
+
+/** Pays a finished run into the ledger on this device. */
+function bankRun(levelId: string, time: number, coins: number): { reward: Reward; wallet: number } {
+  const par = levelById(levelId).par;
+  if (!par) return { reward: { base: 0, bonus: 0, total: 0 }, wallet: walletOf(readLedger()) };
+  const { ledger, reward } = applyRun(readLedger(), levelId, time, coins, par);
+  writeLedger(ledger);
+  return { reward, wallet: walletOf(ledger) };
 }
 
 type GameState = {
@@ -51,13 +77,15 @@ type GameState = {
   /** Everything is loaded and the scene has settled; the title card can clear. */
   sceneReady: boolean;
   /** Final time of the last win, and the best time after it. */
-  result: { time: number; best: number; isBest: boolean } | null;
+  result: { time: number; best: number; isBest: boolean; reward: Reward; wallet: number } | null;
   setPhase: (phase: Phase) => void;
   setTotalCoins: (n: number) => void;
   setDebug: (debug: boolean) => void;
   setPaused: (paused: boolean) => void;
   collect: () => void;
   restart: () => void;
+  /** Plays another level: the room fogs over to white, then the page reloads on `?level=<id>` so nothing of the old level carries over. */
+  goToLevel: (id: string) => void;
 };
 
 export const useGame = create<GameState>((set, get) => ({
@@ -75,15 +103,16 @@ export const useGame = create<GameState>((set, get) => ({
   setDebug: (debug) => set({ debug }),
   setPaused: (paused) => set({ paused: paused && get().phase === "playing" }),
   collect: () => {
-    const { collected, phase, totalCoins } = get();
+    const { collected, phase, totalCoins, levelId } = get();
     if (phase !== "playing" || totalCoins === 0) return;
     const next = collected + 1;
     if (next < totalCoins) return set({ collected: next });
     const time = runtime.elapsed;
-    const prev = readBest();
+    const prev = readBest(levelId);
     const isBest = prev === null || time < prev;
-    if (isBest) writeBest(time);
-    set({ collected: next, phase: "won", result: { time, best: isBest ? time : prev, isBest } });
+    if (isBest) writeBest(levelId, time);
+    const { reward, wallet } = bankRun(levelId, time, totalCoins);
+    set({ collected: next, phase: "won", result: { time, best: isBest ? time : prev, isBest, reward, wallet } });
   },
   restart: () => {
     const { phase, sceneReady } = get();
@@ -93,6 +122,18 @@ export const useGame = create<GameState>((set, get) => ({
     setTimeout(() => {
       runtime.elapsed = 0;
       set((s) => ({ runId: s.runId + 1, collected: 0, result: null, phase: "intro" }));
+    }, RESET_FADE_MS);
+  },
+  goToLevel: (id) => {
+    const { phase, sceneReady } = get();
+    if (phase === "loading" || phase === "resetting" || !sceneReady) return;
+    const target = levelById(id).id;
+    set({ phase: "resetting", paused: false });
+    // A fresh load per level: physics, caches and per-run state all start clean, whatever the level.
+    setTimeout(() => {
+      const url = new URL(window.location.href);
+      url.searchParams.set("level", target);
+      window.location.assign(url.toString());
     }, RESET_FADE_MS);
   },
 }));
@@ -107,8 +148,17 @@ export const runtime = {
   grounded: true,
   /** Mid ledge climb: the camera follows vertically with less lag. */
   climbing: false,
-  /** Camera yaw (radians, 0 = looking toward -Z). Movement is relative to this. */
+  /** Camera yaw (radians, 0 = looking toward -Z). */
   cameraYaw: 0,
+  /** The yaw the controls are relative to. It follows the camera, except that a direction held through a camera flip keeps its meaning. */
+  moveYaw: 0,
+  /** Hue is being steered right now (set by the controller). */
+  steering: false,
+  /** Two-sided streets: which side the camera is on (+1 / -1) and how far through the swing between them (0..1, eased). */
+  camSide: 1 as 1 | -1,
+  camFlip: 0,
+  /** Where this run started (feet): the camera's intro rise is measured from it. */
+  startFeet: new THREE.Vector3(),
   cameraPos: new THREE.Vector3(),
   /** Z of the open-wall plane, read from COL_Boundary south. */
   openWallZ: 1.52,

@@ -6,7 +6,8 @@ import { useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { DYNAMIC_PROP_PREFIXES } from "./pushables";
 import { runtime } from "./store";
-import { preloadRoom, useRoom } from "./useLevel";
+import { hazeMaterial } from "./fx/haze";
+import { preloadRoom, useLevel, useRoom } from "./useLevel";
 
 export type BoxCollider = {
   name: string;
@@ -86,6 +87,7 @@ function buildColliders(scene: THREE.Object3D): BoxCollider[] {
 
 export function Room() {
   const { scene } = useRoom();
+  const level = useLevel();
 
   const bag = useMemo(() => {
     let found: THREE.Object3D | undefined;
@@ -131,6 +133,37 @@ export function Room() {
       mesh.receiveShadow = true;
     });
   }, [scene]);
+
+  // A two-sided street: the row of buildings the camera is standing beside would sit right in front of the lens,
+  // so it is hidden while the camera is on its side (both show while it swings round).
+  const rows = useMemo(() => {
+    const out: { E: THREE.Object3D[]; W: THREE.Object3D[] } = { E: [], W: [] };
+    scene.traverse((o) => {
+      if (o.userData.row === "E") out.E.push(o);
+      else if (o.userData.row === "W") out.W.push(o);
+    });
+    return out;
+  }, [scene]);
+  const shown = useRef({ E: true, W: true });
+  useFrame(() => {
+    if (!level.camera?.twoSided) return;
+    const showE = runtime.camFlip >= 0.25;
+    const showW = runtime.camFlip <= 0.75;
+    if (showE !== shown.current.E) for (const o of rows.E) o.visible = showE;
+    if (showW !== shown.current.W) for (const o of rows.W) o.visible = showW;
+    shown.current = { E: showE, W: showW };
+  });
+
+  // The street's far ends: nodes flagged `haze` in the model fade into white.
+  useLayoutEffect(() => {
+    const h = level.haze;
+    if (!h) return;
+    scene.traverse((obj) => {
+      const mesh = obj as THREE.Mesh;
+      if (!mesh.isMesh || !mesh.userData.haze) return;
+      mesh.material = Array.isArray(mesh.material) ? mesh.material.map((m) => hazeMaterial(m, h)) : hazeMaterial(mesh.material, h);
+    });
+  }, [scene, level]);
 
   return (
     <>

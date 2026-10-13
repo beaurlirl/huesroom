@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import type { Animator } from "./animator";
 import { playSfx } from "./audio/sfx";
-import { sampleCurve, type RootCurve } from "./clips";
+import { sampleCurve, type RootCurve, type TopOutCurve } from "./clips";
 import { BOOKS, CLIMB, CLIP_TIMES, FLAGS, HUE, LANDING, MOVE } from "./config";
 import type { InputSample } from "./input";
 import { pushableBodies } from "./pushables";
@@ -32,11 +32,22 @@ type Climb = {
   /** The clip has been retimed to land on the ledge. */
   settling: boolean;
 };
-type LadderMove = { kind: "enterTop" | "exitTop" | "exitBottom"; from: THREE.Vector3; to: THREE.Vector3; t: number; time: number };
+type LadderMove = {
+  kind: "enterTop" | "exitTop" | "exitBottom";
+  from: THREE.Vector3;
+  to: THREE.Vector3;
+  t: number;
+  time: number;
+  /** Getting over the top with the `climb_top` clip: the root follows its hip path (scaled to the deck by `reach`) instead of easing from `from` to `to`. */
+  topOut?: { dir: THREE.Vector3; reach: number };
+};
 
 const R = HUE.capsuleRadius;
 const CAPSULE_CENTER = HUE.capsuleHalfHeight + R; // feet → capsule centre
 const HEIGHT = 2 * CAPSULE_CENTER;
+/** Kerbs, doorsteps and stair treads: risers Hue simply steps up (taller ones are ledge climbs, see CLIMB.minRise). */
+const STEP_MIN = 0.02;
+const STEP_MAX = 0.105;
 /** How far below the feet groundCollider() looks; snap-to-ground lands him up to ~6 cm above a steep surface. */
 const GROUND_PROBE = 0.12;
 
@@ -55,9 +66,12 @@ type Ladder = {
   line: THREE.Vector3; // capsule centre XZ while climbing
 };
 
-function readLadder(): Ladder | null {
-  const meta = roomColliders.find((c) => c.userData.ladder);
-  if (!meta) return null;
+/** Every collider flagged `ladder` in the level (a street has one on each fire escape). */
+function readLadders(): Ladder[] {
+  return roomColliders.filter((c) => c.userData.ladder).map(readLadder);
+}
+
+function readLadder(meta: BoxCollider): Ladder {
   const u = meta.userData as {
     bottom_z_blender: number;
     top_z_blender: number;
@@ -116,7 +130,9 @@ class HueMover {
   private ladderNeedsRelease = false;
   /** Whether autostep currently ignores dynamic bodies (true while running). */
   private autostepDynamic = false;
+  /** The ladder Hue is on (or last used); `ladders` is every ladder in the level. */
   private ladder: Ladder | null;
+  private ladders: Ladder[];
   private ray: InstanceType<Rapier["Ray"]>;
 
   constructor(
@@ -128,8 +144,10 @@ class HueMover {
     private anim: Animator,
     private rollCurve: RootCurve,
     private climbRiseSpeed: number,
+    private topOut: TopOutCurve,
   ) {
-    this.ladder = readLadder();
+    this.ladders = readLadders();
+    this.ladder = this.ladders[0] ?? null;
     this.ray = new rapier.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: -1, z: 0 });
   }
 
@@ -157,7 +175,7 @@ class HueMover {
 
   // ---------------------------------------------------------------- queries
 
-  private isLadder = (c: Collider) => !!this.ladder && colliderMeta.get(c.handle) === this.ladder.meta;
+  private isLadder = (c: Collider) => this.ladders.some((l) => colliderMeta.get(c.handle) === l.meta);
 
   /** Solid, non-sensor colliders other than Hue (and optionally the ladder). */
   private solid = (ignoreLadder: boolean) => (c: Collider) =>
@@ -239,7 +257,7 @@ class HueMover {
     this.debugProbe.active = false;
 
     // Camera-relative input on the ground plane (yaw only, so looking down still walks forward).
-    const cy = runtime.debug.input ? 0 : runtime.cameraYaw;
+    const cy = runtime.debug.input ? 0 : runtime.moveYaw;
     let dirX = -Math.sin(cy) * input.moveZ + Math.cos(cy) * input.moveX;
     let dirZ = -Math.cos(cy) * input.moveZ - Math.sin(cy) * input.moveX;
     const mag = Math.min(1, Math.hypot(dirX, dirZ));
@@ -248,6 +266,7 @@ class HueMover {
       dirX /= l;
       dirZ /= l;
     }
+    runtime.steering = mag > 0.1;
     if (mag < 0.1) this.ladderNeedsRelease = false;
     const jumpPressed = input.jump && !this.prevJump;
     this.prevJump = input.jump;
@@ -298,7 +317,8 @@ class HueMover {
     if (this.mode === "ground" && !locked && inputMag > 0.5) {
       if (this.tryLadder(dirX, dirZ)) return this.publish();
       const facingDot = Math.cos(this.yaw) * dirX - Math.sin(this.yaw) * dirZ;
-      const ledge = facingDot > 0.7 ? this.probeLedge(dirX, dirZ) : null;
+      // A low riser right ahead is a stair step (or a kerb), not a ledge: walk up it. Short treads put the step after next in the probe's reach.
+      const ledge = facingDot > 0.7 && this.stepLift(dirX, dirZ) === 0 ? this.probeLedge(dirX, dirZ) : null;
       this.pushTimer = ledge ? this.pushTimer + dt : 0;
       if (ledge && this.pushTimer >= CLIMB.pushTime) {
         this.startClimb(ledge.top, ledge.faceDist, dirX, dirZ);
@@ -332,7 +352,7 @@ class HueMover {
       this.autostepDynamic = running;
       this.cc.enableAutostep(MOVE.autostepMax, MOVE.autostepMinWidth, !running);
     }
-    const m = this.move(desired, false);
+    const m = this.move(desired, false, true);
     this.pushProps();
     const wasGrounded = this.grounded;
     this.grounded = this.cc.computedGrounded() && this.vel.y <= 0;
@@ -349,10 +369,40 @@ class HueMover {
     this.publish();
   }
 
+  /**
+   * Low risers (kerbs, doorsteps, stair treads) between STEP_MIN and STEP_MAX, just under the ledge climb's minimum rise:
+   * the controller's autostep does not take them here, so when Hue walks into one on fixed geometry, with head-room, lift him onto it.
+   * Returns the lift in metres (0 = nothing to step on).
+   */
+  private stepLift(dx: number, dz: number) {
+    const f = this.feet;
+    const px = f.x + dx * (R + 0.03);
+    const pz = f.z + dz * (R + 0.03);
+    const fixedSolid = (c: Collider) => this.solid(true)(c) && !!c.parent()?.isFixed();
+    const y0 = f.y + STEP_MAX + 0.03;
+    const hit = this.cast(px, y0, pz, 0, -1, 0, STEP_MAX + 0.03 - STEP_MIN, fixedSolid);
+    if (!hit || hit.normal.y < 0.7) return 0;
+    const top = y0 - hit.timeOfImpact;
+    const rise = top - f.y;
+    if (rise < STEP_MIN || rise > STEP_MAX) return 0;
+    if (this.cast(px, top + 0.01, pz, 0, 1, 0, HEIGHT - 0.04, this.solid(true))) return 0; // no head-room
+    return rise;
+  }
+
   /** Moves the capsule through the character controller and returns the applied delta. */
-  private move(desired: { x: number; y: number; z: number }, ignoreLadder: boolean) {
+  private move(desired: { x: number; y: number; z: number }, ignoreLadder: boolean, canStep = false) {
     this.cc.computeColliderMovement(this.collider, desired, undefined, undefined, this.solid(ignoreLadder));
-    const m = this.cc.computedMovement();
+    let m = this.cc.computedMovement();
+    if (canStep && this.grounded && this.mode === "ground") {
+      const h = Math.hypot(desired.x, desired.z);
+      if (h > 1e-5 && Math.hypot(m.x, m.z) < h * 0.6) {
+        const lift = this.stepLift(desired.x / h, desired.z / h);
+        if (lift > 0) {
+          this.cc.computeColliderMovement(this.collider, { x: desired.x, y: desired.y + lift + 0.002, z: desired.z }, undefined, undefined, this.solid(ignoreLadder));
+          m = this.cc.computedMovement();
+        }
+      }
+    }
     this.feet.x += m.x;
     this.feet.y += m.y;
     this.feet.z += m.z;
@@ -447,10 +497,21 @@ class HueMover {
         return;
       }
       if (drop > LANDING.hopMin) {
-        this.landing = { kind: "hop", t: 0, lock: LANDING.hopLock, rollPrev: 0 };
+        const moving = inputMag > 0.3;
+        if (moving && drop <= LANDING.stepMax) {
+          // A little step: touch down and carry on walking, no lock.
+          this.landing = { kind: "soft", t: 0, lock: 0, rollPrev: 0 };
+          a.play("jump", { from: CLIP_TIMES.jumpLand, fade: 0.06, timeScale: 1.3 });
+          this.vel.x *= LANDING.stepCarry;
+          this.vel.z *= LANDING.stepCarry;
+          this.mode = "land";
+          return;
+        }
+        this.landing = { kind: "hop", t: 0, lock: moving ? LANDING.hopLockMoving : LANDING.hopLock, rollPrev: 0 };
         a.play("jump_down", { from: CLIP_TIMES.jumpDownLand, fade: 0.08, timeScale: CLIP_TIMES.jumpDownTimeScale });
-        this.vel.x *= 0.2;
-        this.vel.z *= 0.2;
+        const carry = moving ? LANDING.hopCarry : 0.2;
+        this.vel.x *= carry;
+        this.vel.z *= carry;
         this.mode = "land";
         return;
       }
@@ -486,7 +547,7 @@ class HueMover {
       a.play("idle");
     } else if (!run || s < (MOVE.walkSpeed + MOVE.runSpeed) / 2) {
       a.play("walk");
-      a.setTimeScale(THREE.MathUtils.clamp(s / CLIP_TIMES.walkSpeedAtScale1, 0.5, 2.4));
+      a.setTimeScale(THREE.MathUtils.clamp(s / CLIP_TIMES.walkSpeedAtScale1, 0.5, 3.2));
     } else {
       a.play("run");
       a.setTimeScale(CLIP_TIMES.runTimeScale * THREE.MathUtils.clamp(s / MOVE.runSpeed, 0.6, 1.2));
@@ -586,8 +647,14 @@ class HueMover {
   // ---------------------------------------------------------------- ladder
 
   private tryLadder(dirX: number, dirZ: number) {
-    const L = this.ladder;
-    if (!L || this.ladderNeedsRelease) return false;
+    if (this.ladderNeedsRelease) return false;
+    for (const L of this.ladders) {
+      if (this.tryOneLadder(L, dirX, dirZ)) return true;
+    }
+    return false;
+  }
+
+  private tryOneLadder(L: Ladder, dirX: number, dirZ: number) {
     const f = this.feet;
     const toward = dirX * L.facing.x + dirZ * L.facing.z;
     const lateral = (f.x - L.line.x) * L.facing.z - (f.z - L.line.z) * L.facing.x; // signed distance across
@@ -595,6 +662,7 @@ class HueMover {
 
     // Bottom: on the right-wall shelf, at the ladder, pushing toward it.
     if (Math.abs(f.y - L.bottomY) < 0.05 && Math.abs(lateral) < 0.12 && along > -0.15 && toward > 0.5) {
+      this.ladder = L;
       this.enterLadder();
       this.feet.set(L.line.x, L.bottomY + 0.005, L.line.z);
       return true;
@@ -603,6 +671,7 @@ class HueMover {
     const alongExit = (f.x - L.line.x) * L.exit.x + (f.z - L.line.z) * L.exit.z;
     const backToward = -(dirX * L.exit.x + dirZ * L.exit.z);
     if (Math.abs(f.y - L.topY) < 0.05 && Math.abs(lateral) < 0.12 && alongExit < 0.45 && backToward > 0.5) {
+      this.ladder = L;
       this.enterLadder();
       this.ladderMove = {
         kind: "enterTop",
@@ -644,8 +713,16 @@ class HueMover {
     if (mv) {
       mv.t += dt;
       const k = Math.min(1, mv.t / mv.time);
-      const e = k * k * (3 - 2 * k);
-      this.feet.lerpVectors(mv.from, mv.to, e);
+      if (mv.topOut) {
+        // The clip's own hip path, so the hands and feet stay where the clip put them on the rungs and then the deck.
+        const c = this.topOut;
+        const ct = Math.min(c.duration, mv.t * CLIMB.topOutSpeed);
+        const fwd = sampleCurve({ times: c.times, fwd: c.fwd }, ct) * mv.topOut.reach;
+        this.feet.set(mv.from.x + mv.topOut.dir.x * fwd, mv.from.y + sampleCurve({ times: c.times, fwd: c.up }, ct), mv.from.z + mv.topOut.dir.z * fwd);
+      } else {
+        const e = k * k * (3 - 2 * k);
+        this.feet.lerpVectors(mv.from, mv.to, e);
+      }
       if (k >= 1) {
         this.ladderMove = null;
         if (mv.kind !== "enterTop") {
@@ -681,7 +758,26 @@ class HueMover {
     if (this.feet.y > L.bottomY + 0.05) this.ladderLeftBottom = true;
     this.anim.setTimeScale((sign * CLIMB.ladderSpeed) / this.climbRiseSpeed);
 
-    if (sign > 0 && this.feet.y >= L.topY + 0.01) {
+    // The clip's rise: climbing stops short of the top by this much and the clip takes him over (short ladders keep the plain exit).
+    const topRise = this.topOut.up[this.topOut.up.length - 1];
+    // Only when he climbs up into the last stretch: stepping onto the ladder from the top and pressing up keeps the plain exit.
+    const useClip = L.topY - L.bottomY >= topRise + 0.1 && this.feet.y < L.topY - topRise + 0.15;
+    if (sign > 0 && useClip && this.feet.y >= L.topY - topRise) {
+      this.feet.y = L.topY - topRise;
+      const s = this.ladderExitDistance(L);
+      const clipReach = this.topOut.fwd[this.topOut.fwd.length - 1] + 0.02;
+      const dur = this.topOut.duration / CLIMB.topOutSpeed;
+      this.yaw = yawFor(L.exit.x, L.exit.z);
+      this.ladderMove = {
+        kind: "exitTop",
+        from: this.feet.clone(),
+        to: new THREE.Vector3(L.line.x + L.exit.x * s, L.topY + 0.005, L.line.z + L.exit.z * s),
+        t: 0,
+        time: dur,
+        topOut: { dir: L.exit.clone(), reach: THREE.MathUtils.clamp(s / clipReach, 0.5, 1.25) },
+      };
+      this.anim.play("climb_top", { timeScale: CLIMB.topOutSpeed, fade: 0.1, holdAt: this.topOut.duration - 0.001 });
+    } else if (sign > 0 && !useClip && this.feet.y >= L.topY + 0.01) {
       this.feet.y = L.topY + 0.01;
       const s = this.ladderExitDistance(L);
       this.ladderMove = {
@@ -714,6 +810,7 @@ export function useHueController(
   anim: Animator,
   rollCurve: RootCurve,
   climbRiseSpeed: number,
+  topOut: TopOutCurve,
 ) {
   const { world, rapier } = useRapier();
   const cc = useRef<KinematicCharacterController | null>(null);
@@ -743,11 +840,11 @@ export function useHueController(
       /** Lazily binds once the controller and the body/collider refs exist. */
       get() {
         if (!mover.current && cc.current && body.current && collider.current) {
-          mover.current = new HueMover(world, rapier, cc.current, body.current, collider.current, anim, rollCurve, climbRiseSpeed);
+          mover.current = new HueMover(world, rapier, cc.current, body.current, collider.current, anim, rollCurve, climbRiseSpeed, topOut);
         }
         return mover.current;
       },
     }),
-    [world, rapier, body, collider, anim, rollCurve, climbRiseSpeed],
+    [world, rapier, body, collider, anim, rollCurve, climbRiseSpeed, topOut],
   );
 }

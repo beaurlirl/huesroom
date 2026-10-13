@@ -1,0 +1,493 @@
+[
+ {
+  "name": "cellar L: doorstep -> three steps down",
+  "start": [
+   -2.2,
+   0.18,
+   -1.75,
+   180
+  ],
+  "steps": [
+   {
+    "x": -1,
+    "ms": 2800
+   }
+  ],
+  "expectY": -0.18,
+  "expectCoins": 1
+ },
+ {
+  "name": "cellar R: doorstep -> three steps down",
+  "start": [
+   -1.79,
+   0.18,
+   -1.75,
+   0
+  ],
+  "steps": [
+   {
+    "x": 1,
+    "ms": 1500
+   }
+  ],
+  "expectY": -0.18,
+  "expectCoins": 1
+ },
+ {
+  "name": "cellar L: back up to the doorstep",
+  "start": [
+   -3.17,
+   -0.18,
+   -1.85,
+   0
+  ],
+  "steps": [
+   {
+    "x": 1,
+    "ms": 2200
+   }
+  ],
+  "expectMin": 0.08
+ },
+ {
+  "name": "stoop: sidewalk -> landing (0.79, eight steps)",
+  "start": [
+   -4.475,
+   0.09,
+   -1.1,
+   180
+  ],
+  "steps": [
+   {
+    "z": -1,
+    "ms": 4200
+   }
+  ],
+  "expectY": 0.79
+ },
+ {
+  "name": "awning -> teal sign shelf (1.50)",
+  "start": [
+   -3.5,
+   0.98,
+   -1.55,
+   180
+  ],
+  "steps": [
+   {
+    "z": -1,
+    "ms": 1800
+   }
+  ],
+  "expectY": 1.5
+ },
+ {
+  "name": "sign shelf -> 85 first platform (1.95)",
+  "start": [
+   -3.55,
+   1.5,
+   -1.85,
+   180
+  ],
+  "steps": [
+   {
+    "x": -1,
+    "ms": 1800
+   }
+  ],
+  "expectY": 1.95
+ },
+ {
+  "name": "awning -> 87 ledge (1.45)",
+  "start": [
+   -3.5,
+   0.98,
+   -1.55,
+   0
+  ],
+  "steps": [
+   {
+    "x": 1,
+    "ms": 1800
+   }
+  ],
+  "expectY": 1.45
+ },
+ {
+  "name": "87 ledge ladder -> platform (1.80)",
+  "start": [
+   -2.01,
+   1.45,
+   -1.73,
+   180
+  ],
+  "steps": [
+   {
+    "z": -1,
+    "ms": 6000
+   }
+  ],
+  "expectY": 1.8,
+  "settle": 1500
+ },
+ {
+  "name": "85 sign ladder: shop sign top -> first platform (1.95)",
+  "start": [
+   -5.2,
+   1.29,
+   -1.73,
+   180
+  ],
+  "steps": [
+   {
+    "z": -1,
+    "ms": 14000
+   }
+  ],
+  "expectY": 1.95,
+  "settle": 1500
+ },
+ {
+  "name": "85 flight 1: platform 1 -> 2 (2.80)",
+  "start": [
+   -3.72,
+   1.95,
+   -1.7,
+   180
+  ],
+  "steps": [
+   {
+    "z": 1,
+    "ms": 450
+   },
+   {
+    "x": -1,
+    "ms": 2800
+   }
+  ],
+  "expectY": 2.8,
+  "expectPeak": 2.8
+ },
+ {
+  "name": "85 flight 2: platform 2 -> 3 (3.65)",
+  "start": [
+   -5.2,
+   2.8,
+   -1.7,
+   0
+  ],
+  "steps": [
+   {
+    "z": 1,
+    "ms": 450
+   },
+   {
+    "x": 1,
+    "ms": 2800
+   }
+  ],
+  "expectY": 3.65,
+  "expectPeak": 3.65
+ },
+ {
+  "name": "85 flight 3: platform 3 -> 4 (4.50)",
+  "start": [
+   -3.72,
+   3.65,
+   -1.7,
+   180
+  ],
+  "steps": [
+   {
+    "z": 1,
+    "ms": 450
+   },
+   {
+    "x": -1,
+    "ms": 2800
+   }
+  ],
+  "expectY": 4.5,
+  "expectPeak": 4.5
+ },
+ {
+  "name": "85 roof ladder: top platform -> roof (4.95)",
+  "start": [
+   -3.82,
+   4.5,
+   -1.73,
+   180
+  ],
+  "steps": [
+   {
+    "z": -1,
+    "ms": 12000
+   }
+  ],
+  "expectY": 4.95,
+  "settle": 1500
+ },
+ {
+  "name": "gray tenement drop ladder -> platform (1.50)",
+  "start": [
+   -10.75,
+   0.09,
+   -1.73,
+   180
+  ],
+  "steps": [
+   {
+    "z": -1,
+    "ms": 13000
+   }
+  ],
+  "expectY": 1.5,
+  "settle": 1500
+ },
+ {
+  "name": "planter (west): kerb side -> bed / guard rail (>= 0.23)",
+  "start": [
+   4.75,
+   0.09,
+   -1.0,
+   180
+  ],
+  "steps": [
+   {
+    "z": -1,
+    "ms": 1500
+   }
+  ],
+  "expectMin": 0.23
+ },
+ {
+  "name": "E north: drop ladder -> platform (1.55)",
+  "start": [
+   5.7,
+   0.09,
+   1.73,
+   0
+  ],
+  "steps": [
+   {
+    "z": 1,
+    "ms": 13000
+   }
+  ],
+  "expectY": 1.55,
+  "settle": 1500
+ },
+ {
+  "name": "trash bags: bounce to the high coin (peak > 1.2)",
+  "start": [
+   6.3,
+   0.9,
+   1.42,
+   0
+  ],
+  "steps": [],
+  "expectY": null,
+  "settle": 1500
+ },
+ {
+  "name": "shop plinth: sidewalk -> plinth (0.39)",
+  "start": [
+   -4.945,
+   0.09,
+   -1.0,
+   180
+  ],
+  "steps": [
+   {
+    "z": -1,
+    "ms": 2600
+   }
+  ],
+  "expectPeak": 0.39
+ },
+ {
+  "name": "crates: sidewalk -> crate (0.39)",
+  "start": [
+   -12.85,
+   0.09,
+   1.0,
+   0
+  ],
+  "steps": [
+   {
+    "z": 1,
+    "ms": 2200
+   }
+  ],
+  "expectPeak": 0.39
+ },
+ {
+  "name": "crates: crate -> stack top (0.69)",
+  "start": [
+   -12.9,
+   0.39,
+   1.5,
+   0
+  ],
+  "steps": [
+   {
+    "x": -1,
+    "ms": 1500
+   }
+  ],
+  "expectPeak": 0.69
+ },
+ {
+  "name": "SUV: road -> body -> roof (0.64)",
+  "start": [
+   -7.0,
+   0.0,
+   0.15,
+   0
+  ],
+  "steps": [
+   {
+    "z": 1,
+    "ms": 2200
+   },
+   {
+    "x": 1,
+    "ms": 2600
+   }
+  ],
+  "expectPeak": 0.64
+ },
+ {
+  "name": "pigeon bounce toward the museum ledge (1.0)",
+  "start": [
+   -2.0,
+   0.5,
+   1.4,
+   0
+  ],
+  "steps": [
+   {
+    "z": 1,
+    "ms": 1100
+   }
+  ],
+  "expectPeak": 0.95
+ },
+ {
+  "name": "news box E: sidewalk -> box (from the side, 0.47)",
+  "start": [
+   3.15,
+   0.09,
+   1.28,
+   0
+  ],
+  "steps": [
+   {
+    "x": 1,
+    "ms": 1500
+   }
+  ],
+  "expectPeak": 0.47
+ },
+ {
+  "name": "news box -> hotel awning (1.0)",
+  "start": [
+   3.5,
+   0.47,
+   1.3,
+   0
+  ],
+  "steps": [
+   {
+    "z": 1,
+    "ms": 2000
+   }
+  ],
+  "expectY": 1.0
+ },
+ {
+  "name": "gray FE flight 1 (platform 1 -> 2)",
+  "start": [
+   -8.7,
+   1.5,
+   -1.7,
+   180
+  ],
+  "steps": [
+   {
+    "z": 1,
+    "ms": 450
+   },
+   {
+    "x": -1,
+    "ms": 3600
+   }
+  ],
+  "expectPeak": 2.35
+ },
+ {
+  "name": "gray FE roof ladder (platform 4 -> roof 5.25)",
+  "start": [
+   -8.75,
+   4.05,
+   -1.73,
+   180
+  ],
+  "steps": [
+   {
+    "z": -1,
+    "ms": 16000
+   }
+  ],
+  "expectY": 5.25,
+  "settle": 1500
+ },
+ {
+  "name": "museum crates: sidewalk -> step crate (0.39)",
+  "start": [
+   -0.78,
+   0.09,
+   0.9,
+   0
+  ],
+  "steps": [
+   {
+    "z": 1,
+    "ms": 1500
+   }
+  ],
+  "expectPeak": 0.39
+ },
+ {
+  "name": "museum crates: step crate -> tower top (0.69)",
+  "start": [
+   -0.78,
+   0.39,
+   1.5,
+   0
+  ],
+  "steps": [
+   {
+    "x": -1,
+    "ms": 900
+   }
+  ],
+  "expectPeak": 0.69
+ },
+ {
+  "name": "museum crates: tower top -> ledge (1.0)",
+  "start": [
+   -1.15,
+   0.69,
+   1.5,
+   0
+  ],
+  "steps": [
+   {
+    "z": 1,
+    "ms": 900
+   }
+  ],
+  "expectPeak": 1.0
+ }
+]

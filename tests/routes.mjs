@@ -6,7 +6,7 @@ const browser = await chromium.launch({
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 page.on('pageerror', e => console.log('[pageerror]', e.message));
 page.on('console', m => { if (m.type() === 'error') console.log('[console.error]', m.text()); });
-await page.goto('http://localhost:3100/?debug');
+await page.goto('http://localhost:3100/?debug' + (process.env.LEVEL ? `&level=${process.env.LEVEL}` : ''));
 await page.waitForFunction(() => window.__hue?.useGame.getState().phase === 'ready', null, { timeout: 60000 });
 await page.keyboard.press('Space');
 await page.waitForFunction(() => window.__hue.useGame.getState().phase === 'playing', null, { timeout: 10000 });
@@ -22,6 +22,7 @@ for (const leg of legs) {
     d.teleport(...leg.start);
     await sleep(500);
     const trace = [];
+    const coins0 = window.__hue.useGame.getState().collected;
     let maxY = -1, maxClimbV = 0;
     const hist = [];
     const t0 = performance.now();
@@ -45,12 +46,13 @@ for (const leg of legs) {
     const modes = trace.filter((m, i) => m !== trace[i - 1]).join('>');
     const f = r.feet;
     d.input = null;
-    return { end: [f.x, f.y, f.z].map((v) => +v.toFixed(3)), maxY: +maxY.toFixed(2), maxClimbV: +maxClimbV.toFixed(2), modes };
+    return { end: [f.x, f.y, f.z].map((v) => +v.toFixed(3)), maxY: +maxY.toFixed(2), maxClimbV: +maxClimbV.toFixed(2), modes, coins: window.__hue.useGame.getState().collected - coins0 };
   }, leg);
-  const reached = leg.expectY === null ? res.maxY > 1.2 : Math.abs(res.end[1] - leg.expectY) < 0.03;
+  const reached = leg.expectPeak !== undefined ? res.maxY >= leg.expectPeak - 0.03 : leg.expectMin !== undefined ? res.end[1] >= leg.expectMin : leg.expectY === null ? res.maxY > 1.2 : Math.abs(res.end[1] - leg.expectY) < 0.03;
+  const coinsOk = leg.expectCoins === undefined || res.coins >= leg.expectCoins;
   const smooth = res.maxClimbV <= 1.6; // m/s; the loop climbs at 0.28 and the hop peaks near 1.3 (the old burst read 2.0)
-  const ok = reached && smooth;
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${leg.name.padEnd(44)} end y=${res.end[1].toFixed(3)} (want ${leg.expectY})  at [${res.end}]  peak ${res.maxY}  ${res.maxClimbV ? `climb ${res.maxClimbV} m/s  ` : ''}${res.modes}`);
+  const ok = reached && smooth && coinsOk;
+  console.log(`${ok ? 'PASS' : 'FAIL'}  ${leg.name.padEnd(52)} ${leg.expectCoins !== undefined ? `coins ${res.coins}  ` : ''}end y=${res.end[1].toFixed(3)} (want ${leg.expectY})  at [${res.end}]  peak ${res.maxY}  ${res.maxClimbV ? `climb ${res.maxClimbV} m/s  ` : ''}${res.modes}`);
   if (leg.shot) await page.screenshot({ path: `${process.env.S}/route-${leg.shot}.png` });
 }
 await browser.close();

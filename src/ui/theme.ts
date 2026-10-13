@@ -1,5 +1,5 @@
 // Branding for the HUD, menus and share card, after directory.onl (owner's style):
-// Union, uppercase, hard edges, hairline rules, bracketed buttons, blue glass panels.
+// Union, uppercase, hard edges, hairline rules, bracketed buttons, white frosted-glass panels.
 // CSS lives in app/globals.css (.ui, .glass, .glass-veil, .ui-btn, .ui-cta); canvas drawing
 // (the share card) reads the same values from here.
 
@@ -14,6 +14,4 @@ export const theme = {
   blue: "#0047ff",
   blueSoft: "#7aa2ff",
   muted: "rgba(10, 10, 10, 0.55)",
-  /** The line that ends level 1: on the win panel and the share card. */
-  madeIt: "hue made it outside",
 };

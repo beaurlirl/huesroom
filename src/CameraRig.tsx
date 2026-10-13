@@ -2,12 +2,17 @@
 
 import { useFrame, useThree } from "@react-three/fiber";
 import { useRapier, type RapierCollider } from "@react-three/rapier";
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
-import { CAMERA as C, FLAGS } from "./config";
+import { CAMERA as BASE_CAMERA, FLAGS } from "./config";
+import type { LevelCamera } from "./levels";
 import { useIsTouch } from "./Hud";
 import { pollGamepad } from "./input/gamepad";
 import { runtime, useGame } from "./store";
+import { useLevel } from "./useLevel";
+
+/** The base camera numbers (the peek and unblock helpers use these; the rig itself uses the level's `cam`). */
+const C = BASE_CAMERA;
 
 /** Critically damped spring (Unity-style SmoothDamp). Mutates `state.v`. */
 function smoothDamp(current: number, target: number, state: { v: number }, smoothTime: number, dt: number) {
@@ -81,13 +86,15 @@ export function CameraRig() {
   const { world, rapier } = useRapier();
   const peek = usePeek();
   const coarse = useIsTouch();
+  const level = useLevel();
+  const cam = useMemo(() => ({ ...BASE_CAMERA, ...level.camera }) as typeof BASE_CAMERA & LevelCamera, [level]);
   const s = useRef({
     unblock: new THREE.Vector2(),
     cornerW: 0,
     vcw: { v: 0 },
     ladderW: 0,
     vlw: { v: 0 },
-    yMaxNow: C.yMax as number,
+    yMaxNow: cam.yMax as number,
     vux: { v: 0 },
     vuy: { v: 0 },
     initialised: false,
@@ -100,61 +107,67 @@ export function CameraRig() {
     vly: { v: 0 },
     vlz: { v: 0 },
     refY: 0,
-    fov: C.fov,
+    fov: cam.fov,
     vfov: { v: 0 },
+    /** Two-sided streets: the side the camera is on, how far through the swing it is, the intro rise (0 low .. 1 risen), and whether the controls keep their old meaning. */
+    side: 1 as 1 | -1,
+    flip: 0,
+    intro: 0,
+    latch: false,
   });
 
   const targets = (st: typeof s.current) => {
     const feet = runtime.feet;
     // Height deadzone: ignore jump bobs, follow once he lands higher (or drops below).
     if (runtime.grounded || feet.y < st.refY) st.refY = feet.y;
-    else if (feet.y - st.refY > C.jumpDeadzone) st.refY = feet.y - C.jumpDeadzone;
+    else if (feet.y - st.refY > cam.jumpDeadzone) st.refY = feet.y - cam.jumpDeadzone;
 
-    const d = clamp(runtime.openWallZ - feet.z, 0, C.roomDepth);
-    let y = st.refY + THREE.MathUtils.lerp(C.offsetNear, C.offsetFar, d / C.roomDepth);
-    if (d < C.frontEdge) y += C.frontEdgeLift * (C.frontEdge - d);
-    let x = clamp(feet.x, -C.xClamp, C.xClamp);
+    const d = clamp(runtime.openWallZ - st.side * feet.z, 0, cam.roomDepth);
+    let y = st.refY + THREE.MathUtils.lerp(cam.offsetNear, cam.offsetFar, d / cam.roomDepth);
+    if (d < cam.frontEdge) y += cam.frontEdgeLift * (cam.frontEdge - d);
+    y -= (1 - st.intro) * (cam.introDrop ?? 0); // the start shot is low, then rises as Hue walks off
+    let x = clamp(feet.x, cam.xMin ?? -cam.xClamp, cam.xMax ?? cam.xClamp);
 
     // Beanbag corner (back right): following from the right side loses him behind the bag and
     // off the top of the frame when he bounces, so blend to the top-left of the open wall and
     // look down across the room instead (user request).
     const w = st.cornerW;
     if (w > 0.001) {
-      x = THREE.MathUtils.lerp(x, clamp(-feet.x * C.cornerMirror, -C.xClamp, C.xClamp), w);
-      y = THREE.MathUtils.lerp(y, Math.max(y, C.cornerCamY), w);
+      x = THREE.MathUtils.lerp(x, clamp(-feet.x * cam.cornerMirror, -cam.xClamp, cam.xClamp), w);
+      y = THREE.MathUtils.lerp(y, Math.max(y, cam.cornerCamY), w);
     }
     // Ladder / door shelf: the door shelf sits between the camera and the ladder, so rise
     // almost to the ceiling to look over it (user request).
     const lw = st.ladderW;
-    const yMax = THREE.MathUtils.lerp(C.yMax, C.ladderCamY, lw);
+    const yMax = THREE.MathUtils.lerp(cam.yMax, cam.ladderCamY, lw);
     if (lw > 0.001) {
       // Also from the top-left, like the beanbag corner (user request). On narrow portrait
       // screens the far corner needs more turn than the yaw clamp allows and Hue left the frame
       // at the top of the ladder, so there the camera only goes far enough left to face him
       // within ladderPortraitYaw.
-      let cornerX = clamp(-feet.x * C.cornerMirror, -C.xClamp, C.xClamp);
-      const limit = camera.aspect < 1 ? C.ladderPortraitYaw : coarse ? C.ladderPhoneYaw : null;
+      let cornerX = clamp(-feet.x * cam.cornerMirror, -cam.xClamp, cam.xClamp);
+      const limit = camera.aspect < 1 ? cam.ladderPortraitYaw : coarse ? cam.ladderPhoneYaw : null;
       if (limit !== null) {
-        const depth = Math.max(0.05, runtime.openWallZ + C.planeOffset - feet.z);
+        const depth = Math.max(0.05, runtime.openWallZ + cam.planeOffset - feet.z);
         cornerX = Math.max(cornerX, feet.x - depth * Math.tan(limit));
       }
-      x = THREE.MathUtils.lerp(x, clamp(cornerX, -C.xClamp, C.xClamp), lw);
-      y = THREE.MathUtils.lerp(y, Math.max(y, C.ladderCamY), lw);
+      x = THREE.MathUtils.lerp(x, clamp(cornerX, -cam.xClamp, cam.xClamp), lw);
+      y = THREE.MathUtils.lerp(y, Math.max(y, cam.ladderCamY), lw);
     }
     st.yMaxNow = yMax;
     return {
       x,
-      y: clamp(y, C.yMin, yMax),
-      look: new THREE.Vector3(feet.x, feet.y + C.chestHeight, feet.z),
+      y: clamp(y, cam.yMin, yMax),
+      look: new THREE.Vector3(feet.x, feet.y + cam.chestHeight, feet.z),
       d,
     };
   };
 
   useLayoutEffect(() => {
-    camera.near = C.near;
-    camera.fov = C.fov;
+    camera.near = cam.near;
+    camera.fov = cam.fov;
     camera.updateProjectionMatrix();
-  }, [camera]);
+  }, [camera, cam.near, cam.fov]);
 
   const euler = useRef(new THREE.Euler(0, 0, 0, "YXZ"));
 
@@ -187,8 +200,8 @@ export function CameraRig() {
   const findClearOffset = (x: number, y: number, z: number, target: THREE.Vector3): [number, number] => {
     if (isClear(x, y, z, target)) return [0, 0];
     for (const [side, up] of UNBLOCK_CANDIDATES) {
-      const cx = clamp(x + side, -C.xClamp, C.xClamp);
-      const cy = clamp(y + up, C.yMin, s.current.yMaxNow);
+      const cx = clamp(x + side, -cam.xClamp, cam.xClamp);
+      const cy = clamp(y + up, cam.yMin, s.current.yMaxNow);
       if (isClear(cx, cy, z, target)) return [side, up];
     }
     return [0, 0];
@@ -197,9 +210,14 @@ export function CameraRig() {
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, 1 / 20);
     const st = s.current;
-    const z = runtime.openWallZ + C.planeOffset;
+    const xmin = cam.xMin ?? -cam.xClamp;
+    const xmax = cam.xMax ?? cam.xClamp;
 
     if (!st.initialised && runtime.hueReady) {
+      st.side = cam.twoSided && runtime.feet.z > 0 ? -1 : 1;
+      st.flip = st.side > 0 ? 0 : 1;
+      st.intro = 0;
+      st.latch = false;
       st.refY = runtime.feet.y;
       const t = targets(st);
       st.x = t.x;
@@ -212,28 +230,52 @@ export function CameraRig() {
     if (!st.initialised) return;
 
     const f = runtime.feet;
-    const inCorner = f.x > C.cornerMinX && f.z < C.cornerMaxZ;
-    st.cornerW = clamp(smoothDamp(st.cornerW, inCorner ? 1 : 0, st.vcw, C.cornerBlend, dt), 0, 1);
-    const nearLadder = f.x > C.ladderMinX && f.z > C.ladderMinZ && f.y > C.ladderMinY;
-    st.ladderW = clamp(smoothDamp(st.ladderW, nearLadder ? 1 : 0, st.vlw, C.cornerBlend, dt), 0, 1);
+    const inCorner = f.x > cam.cornerMinX && f.z < cam.cornerMaxZ;
+    st.cornerW = clamp(smoothDamp(st.cornerW, inCorner ? 1 : 0, st.vcw, cam.cornerBlend, dt), 0, 1);
+    const nearLadder = f.x > cam.ladderMinX && f.z > cam.ladderMinZ && f.y > cam.ladderMinY;
+    st.ladderW = clamp(smoothDamp(st.ladderW, nearLadder ? 1 : 0, st.vlw, cam.cornerBlend, dt), 0, 1);
+
+    // Two-sided streets: the camera shows the facades of the side Hue is on. Crossing the street's centre line
+    // (z = 0, with a dead band) swings it round to the other side.
+    if (cam.twoSided) {
+      const want = f.z > cam.flipDeadband ? -1 : f.z < -cam.flipDeadband ? 1 : st.side;
+      if (want !== st.side) {
+        st.side = want;
+        st.latch = runtime.steering; // a direction held through the swing keeps its meaning until let go
+      }
+      const goal = st.side > 0 ? 0 : 1;
+      st.flip += Math.max(-dt / cam.flipTime, Math.min(dt / cam.flipTime, goal - st.flip));
+    }
+    runtime.camSide = st.side;
+    runtime.camFlip = st.flip * st.flip * (3 - 2 * st.flip);
+    // Intro rise: start low, climb to the normal height as Hue walks away from where he began (one way: it stays up).
+    if (cam.introDrop) {
+      const k = clamp(f.distanceTo(runtime.startFeet) / (cam.introDist ?? 1), 0, 1);
+      st.intro = Math.max(st.intro, k * k * (3 - 2 * k));
+    }
     const t = targets(st);
-    st.x = smoothDamp(st.x, t.x, st.vx, C.smoothX, dt);
+    st.x = smoothDamp(st.x, t.x, st.vx, cam.smoothX, dt);
     // The hop over a ledge's lip is quick: follow it closely so Hue never rides up out of frame.
-    const rise = runtime.climbing ? C.climbSmoothScale : 1;
-    st.y = smoothDamp(st.y, t.y, st.vy, C.smoothY * rise, dt);
+    const rise = runtime.climbing ? cam.climbSmoothScale : 1;
+    st.y = smoothDamp(st.y, t.y, st.vy, cam.smoothY * rise, dt);
     st.look.set(
-      smoothDamp(st.look.x, t.look.x, st.vlx, C.smoothLook, dt),
-      smoothDamp(st.look.y, t.look.y, st.vly, C.smoothLook * rise, dt),
-      smoothDamp(st.look.z, t.look.z, st.vlz, C.smoothLook, dt),
+      smoothDamp(st.look.x, t.look.x, st.vlx, cam.smoothLook, dt),
+      smoothDamp(st.look.y, t.look.y, st.vly, cam.smoothLook * rise, dt),
+      smoothDamp(st.look.z, t.look.z, st.vlz, cam.smoothLook, dt),
     );
 
-    // Blocked view: slide up / sideways on the plane until Hue's chest is visible.
+    // Blocked view: slide up / sideways until Hue's chest is visible. The camera sits on the +z plane (side +1), on the
+    // -z plane (side -1), or swings between them around the street's centre line.
+    const theta = Math.PI * runtime.camFlip;
+    const plane = runtime.openWallZ + cam.planeOffset;
+    const z = plane * Math.cos(theta);
+    const orbitX = plane * Math.sin(theta);
     const chest = t.look;
-    const want = findClearOffset(st.x, st.y, z, chest);
-    st.unblock.x = smoothDamp(st.unblock.x, want[0], st.vux, C.unblockSmooth, dt);
-    st.unblock.y = smoothDamp(st.unblock.y, want[1], st.vuy, C.unblockSmooth, dt);
-    const camX = clamp(st.x + st.unblock.x, -C.xClamp, C.xClamp);
-    const camY = clamp(st.y + st.unblock.y, C.yMin, st.yMaxNow);
+    const want = findClearOffset(st.x + orbitX, st.y, z, chest);
+    st.unblock.x = smoothDamp(st.unblock.x, want[0], st.vux, cam.unblockSmooth, dt);
+    st.unblock.y = smoothDamp(st.unblock.y, want[1], st.vuy, cam.unblockSmooth, dt);
+    const camX = clamp(st.x + st.unblock.x, xmin, xmax) + orbitX;
+    const camY = clamp(st.y + st.unblock.y, cam.yMin, st.yMaxNow);
     camera.position.set(camX, camY, z);
     runtime.cameraPos.copy(camera.position);
 
@@ -241,27 +283,31 @@ export function CameraRig() {
     const dy = st.look.y - camY;
     const dz = st.look.z - z;
     const horiz = Math.hypot(dx, dz);
-    const yaw = clamp(Math.atan2(-dx, -dz), -C.yawClamp, C.yawClamp);
-    const pitch = clamp(Math.atan2(dy, horiz), C.pitchMin, C.pitchMax);
+    const turn = Math.atan2(-dx, -dz) - theta;
+    const yaw = theta + clamp(Math.atan2(Math.sin(turn), Math.cos(turn)), -cam.yawClamp, cam.yawClamp);
+    const pitch = clamp(Math.atan2(dy, horiz), cam.pitchMin, cam.pitchMax);
 
     const p = peek.current;
     if (!p.dragging) {
       // Right stick peeks too (held = look, released = spring back).
       const pad = pollGamepad();
-      p.yaw = smoothDamp(p.yaw, -pad.lookX * C.peekYaw, p.vy, pad.lookX ? 0.12 : C.peekReturn, dt);
-      p.pitch = smoothDamp(p.pitch, -pad.lookY * C.peekPitch, p.vp, pad.lookY ? 0.12 : C.peekReturn, dt);
+      p.yaw = smoothDamp(p.yaw, -pad.lookX * cam.peekYaw, p.vy, pad.lookX ? 0.12 : cam.peekReturn, dt);
+      p.pitch = smoothDamp(p.pitch, -pad.lookY * cam.peekPitch, p.vp, pad.lookY ? 0.12 : cam.peekReturn, dt);
     }
     euler.current.set(pitch + p.pitch, yaw + p.yaw, 0);
     camera.quaternion.setFromEuler(euler.current);
     runtime.cameraYaw = yaw;
+    // The controls follow the camera, except that a direction held through a flip keeps its meaning until it is let go.
+    if (st.latch && !runtime.steering) st.latch = false;
+    if (!st.latch) runtime.moveYaw = yaw;
 
     const dist = Math.hypot(dx, dy, dz);
-    let fovTarget = dist > C.fovFarDistance ? C.fovFar : C.fov;
-    if (t.d < C.frontEdge) fovTarget = C.fov + (C.fovFront - C.fov) * ((C.frontEdge - t.d) / C.frontEdge);
+    let fovTarget = dist > cam.fovFarDistance ? cam.fovFar : cam.fov;
+    if (t.d < cam.frontEdge) fovTarget = cam.fov + (cam.fovFront - cam.fov) * ((cam.frontEdge - t.d) / cam.frontEdge);
     if (FLAGS.PORTRAIT_FOV_BOOST && camera.aspect < 1) {
-      const minH = THREE.MathUtils.degToRad(C.portraitMinHFov);
+      const minH = THREE.MathUtils.degToRad(cam.portraitMinHFov);
       const needV = THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(minH / 2) / camera.aspect));
-      fovTarget = Math.max(fovTarget, Math.min(needV, C.portraitMaxVFov));
+      fovTarget = Math.max(fovTarget, Math.min(needV, cam.portraitMaxVFov));
     }
     st.fov = smoothDamp(st.fov, fovTarget, st.vfov, 0.5, dt);
     if (Math.abs(camera.fov - st.fov) > 0.01) {

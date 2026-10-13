@@ -102,7 +102,7 @@ function GraphicsMessage({ text, action }: { text: string; action?: { label: str
         {text}
       </p>
       {action && (
-        <button type="button" onClick={action.onClick} className="ui-cta text-sm" style={{ background: theme.blue, color: theme.paper, borderColor: theme.blue }}>
+        <button type="button" onClick={action.onClick} className="ui-cta text-sm">
           {action.label}
         </button>
       )}

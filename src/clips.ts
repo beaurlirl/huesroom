@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import type { ClipName } from "./config";
+import { CLIMB, HUE, type ClipName } from "./config";
 
 /**
  * Hips translation track layout (armature space, verified in scripts/inspect-clips.mjs):
@@ -114,6 +114,66 @@ function normalizeClimb(clip: THREE.AnimationClip, metresPerUnit: number, footBe
   return riseSpeed;
 }
 
+/**
+ * The top of a ladder: how Hue's root moves while `climb_top` plays, in metres from where it starts (the lowest foot on the rung).
+ * `fwd` is along the exit direction, `up` is the rise; both are the clip's own Hips path (so hands and feet stay put on the rungs
+ * and the deck) with the clip's standing-height difference taken out so the feet end exactly on the deck.
+ */
+export type TopOutCurve = { times: Float32Array; fwd: Float32Array; up: Float32Array; duration: number };
+
+/**
+ * `climb_top` came out of the converter facing +Z, a quarter turn from the other clips (+X): turn it 90° about up. Then move the
+ * Hips' path out of the track and into `TopOutCurve`, leaving the Hips where they sit relative to the root at the start.
+ */
+function prepareTopOut(clip: THREE.AnimationClip, metresPerUnit: number): TopOutCurve {
+  const rot = clip.tracks.find((t) => t.name === "mixamorigHips.quaternion");
+  if (!rot) throw new Error("climb_top: no Hips rotation track");
+  const turn = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, -1), Math.PI / 2);
+  const q = new THREE.Quaternion();
+  const r = rot.values;
+  for (let i = 0; i < r.length; i += 4) {
+    q.set(r[i], r[i + 1], r[i + 2], r[i + 3]).premultiply(turn);
+    r[i] = q.x;
+    r[i + 1] = q.y;
+    r[i + 2] = q.z;
+    r[i + 3] = q.w;
+  }
+  const pos = hipsTrack(clip);
+  const v = pos.values;
+  const p = new THREE.Vector3();
+  for (let i = 0; i < v.length; i += 3) {
+    p.set(v[i], v[i + 1], v[i + 2]).applyQuaternion(turn);
+    v[i] = p.x;
+    v[i + 1] = p.y;
+    v[i + 2] = p.z;
+  }
+  const times = pos.times;
+  const end = Math.min(CLIMB.topOutEnd, times[times.length - 1]);
+  const n = times.filter((t) => t <= end).length;
+  const k = HUE.visualScale;
+  const f0 = CLIMB.topOutFootBelowHips[0] * k;
+  const f1 = CLIMB.topOutFootBelowHips[1] * k;
+  const rise = -(v[(n - 1) * 3 + UP] - v[UP]) * metresPerUnit;
+  const fwd = new Float32Array(n);
+  const up = new Float32Array(n);
+  const fwd0 = v[FWD];
+  const up0 = v[UP];
+  for (let k = 0; k < v.length / 3; k++) {
+    const i = k * 3;
+    const riseK = -(v[i + UP] - up0) * metresPerUnit;
+    const prog = rise > 0 ? Math.min(1, riseK / rise) : 0;
+    if (k < n) {
+      fwd[k] = (v[i + FWD] - fwd0) * metresPerUnit;
+      up[k] = riseK - (f1 - f0) * prog; // the root ends on the deck: the hips-to-foot difference is carried by the Hips instead
+    }
+    // The Hips keep their start offset above the root (plus that same difference as the clip goes on), and no path.
+    v[i + FWD] = (-0.02 * k) / metresPerUnit;
+    v[i + SIDE] = 0;
+    v[i + UP] = -(f0 + (f1 - f0) * prog) / metresPerUnit;
+  }
+  return { times: Float32Array.from(times.slice(0, n)), fwd, up, duration: times[n - 1] };
+}
+
 /** Moves every frame of the Hips horizontally by (df, ds) track units. */
 function shiftHorizontal(clip: THREE.AnimationClip, df: number, ds: number) {
   const v = hipsTrack(clip).values;
@@ -135,6 +195,8 @@ export type PreparedClips = {
   rollCurve: RootCurve;
   /** How fast `climb_ladder` rises at timeScale 1 (m/s), before its rise was removed. */
   climbRiseSpeed: number;
+  /** How the root moves over the top of a ladder while `climb_top` plays. */
+  topOut: TopOutCurve;
 };
 
 /**
@@ -174,7 +236,9 @@ export function prepareClips(
   // Measured with scripts/clip-limbs.mjs: at frame 0 the lowest foot is 0.166 m below the Hips,
   // and the Hips hang ~0.085 m behind the hands/feet. Hips 0.02 m behind the root puts the
   // hands and feet at the capsule's front (radius 0.06), i.e. on the ledge face or the rungs.
-  const climbRiseSpeed = normalizeClimb(clips.climb_ladder, metresPerUnit, 0.166, -0.02);
+  const climbRiseSpeed = normalizeClimb(clips.climb_ladder, metresPerUnit, 0.166 * HUE.visualScale, -0.02 * HUE.visualScale);
+
+  const topOut = prepareTopOut(clips.climb_top, metresPerUnit);
 
   for (const name of ["idle", "walk", "run", "jump_down", "jump_down_2", "fall_roll"] as const) {
     stripHorizontal(clips[name]);
@@ -188,5 +252,6 @@ export function prepareClips(
     seatedRootOffset: new THREE.Vector3(-sitShift[0] * metresPerUnit, 0, -sitShift[1] * metresPerUnit),
     rollCurve,
     climbRiseSpeed,
+    topOut,
   };
 }
