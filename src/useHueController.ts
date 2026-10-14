@@ -128,6 +128,8 @@ class HueMover {
   private ladderLeftBottom = false;
   /** Just stepped off the ladder: don't re-grab it until the stick/keys are let go. */
   private ladderNeedsRelease = false;
+  /** The camera's turn when he took hold of a ladder or a ledge: the keys keep that meaning until he lets go, however the camera swings (a held key must not flip from "toward the ladder" to "away"). */
+  private controlYaw: number | null = null;
   /** Whether autostep currently ignores dynamic bodies (true while running). */
   private autostepDynamic = false;
   /** The ladder Hue is on (or last used); `ladders` is every ladder in the level. */
@@ -257,7 +259,8 @@ class HueMover {
     this.debugProbe.active = false;
 
     // Camera-relative input on the ground plane (yaw only, so looking down still walks forward).
-    const cy = runtime.debug.input ? 0 : runtime.moveYaw;
+    if (this.mode !== "ladder" && this.mode !== "climb") this.controlYaw = null;
+    const cy = runtime.debug.input ? 0 : (this.controlYaw ?? runtime.moveYaw);
     let dirX = -Math.sin(cy) * input.moveZ + Math.cos(cy) * input.moveX;
     let dirZ = -Math.cos(cy) * input.moveZ - Math.sin(cy) * input.moveX;
     const mag = Math.min(1, Math.hypot(dirX, dirZ));
@@ -568,6 +571,7 @@ class HueMover {
 
   private startClimb(top: number, faceDist: number, dirX: number, dirZ: number) {
     this.mode = "climb";
+    this.controlYaw = runtime.moveYaw;
     // Step far enough to put the capsule centre a few cm past the lip, however far away the
     // face was when the climb started (the probe reaches 0.1 m beyond the capsule).
     const over = Math.max(CLIMB.overDistance, faceDist + CLIMB.overPastLip);
@@ -670,8 +674,9 @@ class HueMover {
     const lateral = (f.x - L.line.x) * L.facing.z - (f.z - L.line.z) * L.facing.x; // signed distance across
     const along = (f.x - L.line.x) * L.facing.x + (f.z - L.line.z) * L.facing.z; // + = toward the ladder
 
-    // Bottom: on the right-wall shelf, at the ladder, pushing toward it.
-    if (Math.abs(f.y - L.bottomY) < 0.05 && Math.abs(lateral) < 0.12 && along > -0.15 && toward > 0.5) {
+    // Bottom: on the right-wall shelf, at the ladder, pushing toward it. He has to be at its foot (`along` is 0 where he rests against it): the far
+    // side of a shelf is on the same line, and from there he must not be pulled through the shelf onto the ladder.
+    if (Math.abs(f.y - L.bottomY) < 0.05 && Math.abs(lateral) < 0.12 && along > -0.15 && along < 0.05 && toward > 0.5) {
       this.ladder = L;
       this.enterLadder();
       this.feet.set(L.line.x, L.bottomY + 0.005, L.line.z);
@@ -698,6 +703,7 @@ class HueMover {
   private enterLadder() {
     const L = this.ladder!;
     this.mode = "ladder";
+    this.controlYaw = runtime.moveYaw;
     this.ladderLeftBottom = false;
     this.vel.set(0, 0, 0);
     this.landing = null;
