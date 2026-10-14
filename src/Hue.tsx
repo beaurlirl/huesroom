@@ -11,6 +11,7 @@ import { ASSETS, CLIP_NAMES, HUE, MOVE, type ClipName } from "./config";
 import { initInput, readInput } from "./input";
 import { isRunning, runtime, useGame } from "./store";
 import { useHueController } from "./useHueController";
+import { theme } from "./ui/theme";
 import { useLevel, useRoom } from "./useLevel";
 
 const IDLE_INPUT = { moveX: 0, moveZ: 0, run: false, jump: false };
@@ -105,6 +106,37 @@ export function Hue() {
       runtime.hueReady = false;
     };
   }, [gltf.scene, root, anim, spawn, startFeet, startClip]);
+
+  // X-ray (levels.ts `xray`): a second copy of every one of his meshes, drawn only where something is in front of him (the depth test is flipped, and nudged toward the camera so it never competes with his own surface), in the
+  // brand blue. It shares his skeleton, so it moves with him; the shelves and counters of a crowded level can then never hide him.
+  useLayoutEffect(() => {
+    if (!level.xray) return;
+    const mat = new THREE.MeshBasicMaterial({ color: theme.blue, transparent: true, opacity: 0.45, depthFunc: THREE.GreaterDepth, depthWrite: false, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
+    const ghosts: THREE.Object3D[] = [];
+    const sources: THREE.Mesh[] = [];
+    gltf.scene.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (m.isMesh && m.visible) sources.push(m);
+    });
+    for (const m of sources) {
+      const sk = m as THREE.SkinnedMesh;
+      const g: THREE.Mesh = sk.isSkinnedMesh ? new THREE.SkinnedMesh(m.geometry, mat) : new THREE.Mesh(m.geometry, mat);
+      g.position.copy(m.position);
+      g.quaternion.copy(m.quaternion);
+      g.scale.copy(m.scale);
+      g.renderOrder = 50;
+      g.frustumCulled = false;
+      g.castShadow = false;
+      g.receiveShadow = false;
+      m.parent?.add(g);
+      if (sk.isSkinnedMesh) (g as unknown as THREE.SkinnedMesh).bind(sk.skeleton, sk.bindMatrix);
+      ghosts.push(g);
+    }
+    return () => {
+      for (const g of ghosts) g.removeFromParent();
+      mat.dispose();
+    };
+  }, [gltf.scene, level]);
 
   // Rise on begin; hand over control when sit_to_stand finishes.
   useEffect(() => {

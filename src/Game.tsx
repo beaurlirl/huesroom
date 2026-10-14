@@ -24,12 +24,15 @@ import { CAMERA } from "./config";
 import { COIN_NODE } from "./levels";
 import { Hue } from "./Hue";
 import { Lighting } from "./Lighting";
+import { Doors } from "./Doors";
+import { StockWiggle } from "./StockWiggle";
 import { blenderName, Room, roomColliders } from "./Room";
 import { ShareButton, ShareSnapshot } from "./ShareCard";
 import { SprayCans } from "./SprayCans";
 import { TouchControls } from "./TouchControls";
 import { runtime, useGame } from "./store";
 import { getLevel, useRoom } from "./useLevel";
+import { HomeMenu } from "./ui/HomeMenu";
 import { Overlay } from "./ui/Overlay";
 import { theme } from "./ui/theme";
 
@@ -67,10 +70,11 @@ function ExposeWorld() {
   const { world } = useRapier();
   const gl = useThree((s) => s.gl);
   const scene = useThree((s) => s.scene);
+  const raycaster = useThree((s) => s.raycaster);
   useEffect(() => {
     const w = window as unknown as { __hue?: Record<string, unknown> };
-    if (w.__hue) Object.assign(w.__hue, { world, gl, scene });
-  }, [world, gl, scene]);
+    if (w.__hue) Object.assign(w.__hue, { world, gl, scene, raycaster });
+  }, [world, gl, scene, raycaster]);
   return null;
 }
 
@@ -196,6 +200,8 @@ export default function Game() {
               <Room />
               <Hue />
               <Coins />
+              <Doors />
+              <StockWiggle />
               <Books />
               <SprayCans />
             <ExposeWorld />
@@ -216,6 +222,7 @@ export default function Game() {
       <TouchControls />
       <Hud share={<ShareButton />} />
       <Overlay />
+      <HomeMenu />
       {/* Drawn over the (still mounted) scene: unmounting physics mid-frame throws in Rapier. */}
       {contextLost && (
         <GraphicsMessage text="The graphics were reset by the device." action={{ label: "Reload", onClick: () => window.location.reload() }} />

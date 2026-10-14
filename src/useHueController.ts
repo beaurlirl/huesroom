@@ -7,7 +7,7 @@ import { playSfx } from "./audio/sfx";
 import { sampleCurve, type RootCurve, type TopOutCurve } from "./clips";
 import { BOOKS, CLIMB, CLIP_TIMES, FLAGS, HUE, LANDING, MOVE } from "./config";
 import type { InputSample } from "./input";
-import { pushableBodies } from "./pushables";
+import { noStandBodies, pushableBodies } from "./pushables";
 import { beanbag, colliderMeta, roomColliders, type BoxCollider } from "./Room";
 import { runtime } from "./store";
 
@@ -359,6 +359,16 @@ class HueMover {
     if (this.grounded) {
       this.lastGroundedAt = this.now;
       if (this.vel.y < 0) this.vel.y = 0;
+      // Food on the deli case is pushed, not stood on: if he has landed on a piece, he slides off it (and drops back to the case).
+      const under = noStandBodies.size ? this.groundCollider()?.parent() : null;
+      if (under && noStandBodies.has(under)) {
+        const p = under.translation();
+        const sx = this.feet.x - p.x;
+        const sz = this.feet.z - p.z;
+        const sd = Math.hypot(sx, sz) || 1;
+        this.feet.x += (sx / sd) * 1.1 * dt;
+        this.feet.z += (sz / sd) * 1.1 * dt;
+      }
     }
     if (!this.grounded && this.vel.y > 0 && m.y < desired.y - 1e-4) this.vel.y = 0; // head bump
 

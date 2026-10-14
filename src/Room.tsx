@@ -145,6 +145,20 @@ export function Room() {
     });
     return out;
   }, [scene]);
+  // Pieces the camera hides when it looks across them (a shot's `cutaway`: the deli's middle shelf).
+  const cutaways = useMemo(() => {
+    const out: THREE.Object3D[] = [];
+    scene.traverse((o) => {
+      if (o.userData.cutaway) out.push(o);
+    });
+    return out;
+  }, [scene]);
+  useFrame(() => {
+    for (const o of cutaways) {
+      const shown = runtime.cutaway !== o.userData.cutaway;
+      if (o.visible !== shown) o.visible = shown;
+    }
+  });
   const shown = useRef({ E: true, W: true });
   useFrame(() => {
     if (!level.camera?.twoSided) return;

@@ -14,6 +14,7 @@ page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 for (const [path, heading, must] of [
   ['/privacy', 'Privacy', ['does not collect your data', 'no analytics', 'iPhone app', 'Purchases', 'Children']],
   ['/support', 'Support', ['Controls', 'Where is my progress saved', 'Report a problem']],
+  ['/terms', 'Terms', ['Playing', 'Who made it', 'Coins and purchases', 'Your progress']],
 ]) {
   const res = await page.goto(BASE + path, { waitUntil: 'load' });
   check(`${path} loads`, res.status() === 200, String(res.status()));

@@ -22,6 +22,11 @@ type Coin = {
   phase: number;
   collected: boolean;
   popT: number; // seconds since collected (-1 = not yet)
+  /** A coin that stays out of reach until another one is collected (node data `requires`), with the line shown when Hue comes near it. */
+  after?: Coin;
+  requires?: string;
+  note?: string;
+  locked: boolean;
   glints: Glint[];
   puffs: Puff[];
 };
@@ -64,6 +69,27 @@ function newPuff(age = 0, burst = false): Puff {
   };
 }
 
+/** A locked coin is a pale ghost of itself: no sparkle, no shimmer, and it can't be picked up. */
+function paint(c: Coin, locked: boolean) {
+  const m = c.material;
+  if (locked) {
+    m.color.setRGB(0.55, 0.57, 0.6, THREE.LinearSRGBColorSpace);
+    m.metalness = 0.5;
+    m.roughness = 0.5;
+    m.emissive.setRGB(0, 0, 0, THREE.LinearSRGBColorSpace);
+    m.opacity = 0.35;
+  } else {
+    m.color.setRGB(...COINS.goldLinear, THREE.LinearSRGBColorSpace);
+    m.metalness = 1;
+    m.roughness = COINS.roughness;
+    m.emissive.setRGB(...COINS.emissiveLinear, THREE.LinearSRGBColorSpace);
+    m.opacity = 1;
+  }
+}
+
+/** How close (m) Hue has to be to a locked coin to be told why it is locked. */
+const HINT_RADIUS = 0.7;
+
 const isTouch = () => typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
 
 /** The level's chrome G coins (every COIN_nn node in the room model): spin, bob, glints, smoke shimmer, collection (prompt 1.8 / 2.7). */
@@ -103,11 +129,15 @@ export function Coins() {
         phase: 0,
         collected: false,
         popT: -1,
+        requires: mesh.userData.requires as string | undefined,
+        note: mesh.userData.locked_note as string | undefined,
+        locked: false,
         glints: [],
         puffs: [],
       });
     });
     list.sort((a, b) => blenderName(a.mesh).localeCompare(blenderName(b.mesh)));
+    for (const c of list) c.after = c.requires ? list.find((o) => blenderName(o.mesh) === c.requires) : undefined;
     list.forEach((c, i) => (c.phase = (i / list.length) * Math.PI * 2));
     return list;
   }, [scene, coinEnv]);
@@ -119,7 +149,8 @@ export function Coins() {
       c.popT = -1;
       c.mesh.visible = true;
       c.mesh.scale.setScalar(1);
-      c.material.opacity = 1;
+      c.locked = !!c.after;
+      paint(c, c.locked);
       c.glints = Array.from({ length: COINS.glintsPerCoin }, () => {
         const g = newGlint();
         g.wait *= Math.random(); // stagger the first pops
@@ -146,6 +177,7 @@ export function Coins() {
   useEffect(() => () => smokeBatch.dispose(), [smokeBatch]);
 
   const clock = useRef(0);
+  const lastHint = useRef<string | null>(null);
   const tmp = useMemo(
     () => ({ normal: new THREE.Vector3(), toCam: new THREE.Vector3(), p: new THREE.Vector3(), q: new THREE.Quaternion() }),
     [],
@@ -161,9 +193,25 @@ export function Coins() {
     const feet = runtime.feet;
     let gi = 0;
     let si = 0;
+    let hint: string | null = null;
 
     for (const c of coins) {
       const { mesh } = c;
+
+      // A locked coin opens the moment the coin it waits for is collected.
+      const locked = !!c.after && !c.after.collected;
+      if (locked !== c.locked) {
+        c.locked = locked;
+        paint(c, locked);
+        if (!locked) {
+          playSfx("chime", { pitch: 1.3 });
+          for (let k = 0; k < COINS.burstPuffs; k++) c.puffs.push(newPuff(0, true));
+        }
+      }
+      if (c.locked && !c.collected && c.note && collecting) {
+        const d = Math.hypot(mesh.position.x - feet.x, mesh.position.z - feet.z);
+        if (d < HINT_RADIUS && Math.abs(mesh.position.y - feet.y) < 0.8) hint = c.note;
+      }
 
       // Spin (one turn per 2.5 s) and bob (±1.5 cm).
       if (c.popT < 0) {
@@ -173,7 +221,7 @@ export function Coins() {
 
       // Collect: Hue's capsule vs the coin's r=0.08 sensor ball, including mid-jump. (A manual
       // test: Rapier doesn't report sensor overlaps between kinematic and fixed bodies by default.)
-      if (!c.collected && collecting) {
+      if (!c.collected && !c.locked && collecting) {
         const y0 = feet.y + HUE.capsuleRadius;
         const y1 = feet.y + HUE.capsuleRadius + 2 * HUE.capsuleHalfHeight;
         const cy = THREE.MathUtils.clamp(mesh.position.y, y0, y1);
@@ -184,7 +232,7 @@ export function Coins() {
           const n = coins.length - coins.filter((k) => !k.collected).length;
           playSfx("chime", { pitch: 1 + n * 0.04 });
           for (let k = 0; k < COINS.burstPuffs; k++) c.puffs.push(newPuff(0, true));
-          useGame.getState().collect();
+          useGame.getState().collect(blenderName(c.mesh));
         }
       }
 
@@ -203,7 +251,7 @@ export function Coins() {
       const facing = Math.abs(normal.dot(toCam));
 
       // Glints: pop at random spots on the ring and the G, some timed to the face lining up.
-      if (mesh.visible && c.popT < 0) {
+      if (mesh.visible && c.popT < 0 && !c.locked) {
         for (const g of c.glints) {
           if (g.wait > 0) {
             g.wait -= dt * (facing > 0.95 ? 4 : 1);
@@ -228,7 +276,7 @@ export function Coins() {
 
       // Smoke shimmer: drifts up, turns, grows 0.10 → 0.18 m, fades over 2–3 s and respawns.
       // Puffs sit slightly behind the coin (away from the camera) so the G stays readable.
-      for (let i = c.puffs.length - 1; i >= 0; i--) {
+      for (let i = c.locked ? -1 : c.puffs.length - 1; i >= 0; i--) {
         const pf = c.puffs[i];
         pf.age += dt;
         let k = pf.age / pf.life;
@@ -256,6 +304,10 @@ export function Coins() {
 
     glintBatch.commit(gi);
     smokeBatch.commit(si);
+    if (hint !== lastHint.current) {
+      lastHint.current = hint;
+      useGame.getState().setHint(hint);
+    }
   });
 
   return (

@@ -18,6 +18,15 @@ function initialLevelId() {
   if (typeof window === "undefined") return LEVELS[0].id;
   return levelById(new URLSearchParams(window.location.search).get("level")).id;
 }
+/**
+ * The home menu (levels, sound, policies) opens on the plain address (what the app and the web home open): `?level=`, `?test` and `?debug` are for
+ * going straight to a level, so scripted tests and links to one level skip it.
+ */
+function initialMenu() {
+  if (typeof window === "undefined") return false;
+  const q = new URLSearchParams(window.location.search);
+  return !q.has("level") && !q.has("test") && !q.has("debug");
+}
 /** Restart: the room fogs over to white glass before it resets behind it. */
 export const RESET_FADE_MS = 650;
 
@@ -72,17 +81,27 @@ type GameState = {
   /** Which level is loaded (an id from LEVELS). */
   levelId: string;
   collected: number;
+  /** The coins collected this run, by node name (a door can wait for one: `open_after`). */
+  collectedNames: string[];
   /** Coins in this level: counted from the room model once it has loaded. */
   totalCoins: number;
   /** Everything is loaded and the scene has settled; the title card can clear. */
   sceneReady: boolean;
+  /** The home menu is up (it shows where the `press any key` prompt would be). */
+  menuOpen: boolean;
+  setMenuOpen: (open: boolean) => void;
+  /** Back to the home menu: the room fogs over to white, then the page reloads on the plain address. */
+  goToMenu: () => void;
+  /** A line to show over the game for as long as it is true (a locked coin's reason), or null. */
+  hint: string | null;
   /** Final time of the last win, and the best time after it. */
   result: { time: number; best: number; isBest: boolean; reward: Reward; wallet: number } | null;
   setPhase: (phase: Phase) => void;
+  setHint: (hint: string | null) => void;
   setTotalCoins: (n: number) => void;
   setDebug: (debug: boolean) => void;
   setPaused: (paused: boolean) => void;
-  collect: () => void;
+  collect: (name?: string) => void;
   restart: () => void;
   /** Plays another level: the room fogs over to white, then the page reloads on `?level=<id>` so nothing of the old level carries over. */
   goToLevel: (id: string) => void;
@@ -95,24 +114,40 @@ export const useGame = create<GameState>((set, get) => ({
   runId: 0,
   levelId: initialLevelId(),
   collected: 0,
+  collectedNames: [],
   totalCoins: 0,
   sceneReady: false,
   result: null,
+  hint: null,
+  menuOpen: initialMenu(),
+  setMenuOpen: (menuOpen) => set({ menuOpen }),
+  goToMenu: () => {
+    const { phase, sceneReady } = get();
+    if (phase === "loading" || phase === "resetting" || !sceneReady) return;
+    set({ phase: "resetting", paused: false });
+    setTimeout(() => {
+      const url = new URL(window.location.href);
+      url.search = "";
+      window.location.assign(url.toString());
+    }, RESET_FADE_MS);
+  },
   setPhase: (phase) => set({ phase }),
+  setHint: (hint) => set({ hint }),
   setTotalCoins: (totalCoins) => set({ totalCoins }),
   setDebug: (debug) => set({ debug }),
   setPaused: (paused) => set({ paused: paused && get().phase === "playing" }),
-  collect: () => {
-    const { collected, phase, totalCoins, levelId } = get();
+  collect: (name) => {
+    const { collected, phase, totalCoins, levelId, collectedNames } = get();
     if (phase !== "playing" || totalCoins === 0) return;
     const next = collected + 1;
-    if (next < totalCoins) return set({ collected: next });
+    const names = name ? [...collectedNames, name] : collectedNames;
+    if (next < totalCoins) return set({ collected: next, collectedNames: names });
     const time = runtime.elapsed;
     const prev = readBest(levelId);
     const isBest = prev === null || time < prev;
     if (isBest) writeBest(levelId, time);
     const { reward, wallet } = bankRun(levelId, time, totalCoins);
-    set({ collected: next, phase: "won", result: { time, best: isBest ? time : prev, isBest, reward, wallet } });
+    set({ collected: next, collectedNames: names, phase: "won", result: { time, best: isBest ? time : prev, isBest, reward, wallet } });
   },
   restart: () => {
     const { phase, sceneReady } = get();
@@ -121,7 +156,7 @@ export const useGame = create<GameState>((set, get) => ({
     // Fog over to white, reset everything behind it, then replay the intro.
     setTimeout(() => {
       runtime.elapsed = 0;
-      set((s) => ({ runId: s.runId + 1, collected: 0, result: null, phase: "intro" }));
+      set((s) => ({ runId: s.runId + 1, collected: 0, collectedNames: [], result: null, phase: "intro" }));
     }, RESET_FADE_MS);
   },
   goToLevel: (id) => {
@@ -162,6 +197,8 @@ export const runtime = {
   cameraPos: new THREE.Vector3(),
   /** Z of the open-wall plane, read from COL_Boundary south. */
   openWallZ: 1.52,
+  /** The name of the model piece the camera is hiding right now (levels.ts shot `cutaway`), or null. */
+  cutaway: null as string | null,
   /** Set once the first clip is bound, playing and evaluated. */
   hueReady: false,
   /** Run time in seconds (counts only while playing and not paused). */
