@@ -12,7 +12,7 @@
     "test:qa": "node tests/qa.mjs",
     "test:gamepad": "node tests/gamepad.mjs",
     "export:hue": "rm -rf out && STATIC_EXPORT=1 NEXT_PUBLIC_BASE_PATH=/huesroom NEXT_PUBLIC_SITE_URL=https://hue.onl next build",
-    "export:app": "rm -rf out && STATIC_EXPORT=1 NEXT_PUBLIC_SITE_URL=https://hue.onl next build",
+    "export:app": "rm -rf out && STATIC_EXPORT=1 next build",
     "test:street": "node tests/street.mjs && LEVEL=street node tests/routes.mjs tests/routes-street.json"
   },
   "dependencies": {

@@ -53,6 +53,6 @@ for (const leg of legs) {
   const smooth = res.maxClimbV <= 1.6; // m/s; the loop climbs at 0.28 and the hop peaks near 1.3 (the old burst read 2.0)
   const ok = reached && smooth && coinsOk;
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${leg.name.padEnd(52)} ${leg.expectCoins !== undefined ? `coins ${res.coins}  ` : ''}end y=${res.end[1].toFixed(3)} (want ${leg.expectY})  at [${res.end}]  peak ${res.maxY}  ${res.maxClimbV ? `climb ${res.maxClimbV} m/s  ` : ''}${res.modes}`);
-  if (leg.shot) await page.screenshot({ path: `${process.env.S}/route-${leg.shot}.png` });
+  if (leg.shot && process.env.S) await page.screenshot({ path: `${process.env.S}/route-${leg.shot}.png` });
 }
 await browser.close();

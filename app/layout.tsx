@@ -12,8 +12,8 @@ const union = localFont({
   display: "swap",
 });
 
-// Absolute URLs for link previews. The game is expected at hue.onl/huesroom (NEXT_PUBLIC_BASE_PATH).
-const site = process.env.NEXT_PUBLIC_SITE_URL ?? "https://hue.onl";
+// Absolute URLs for link previews: the game's own address unless NEXT_PUBLIC_SITE_URL says otherwise (the old hue.onl/huesroom copy sets it, with NEXT_PUBLIC_BASE_PATH).
+const site = process.env.NEXT_PUBLIC_SITE_URL ?? "https://huesroom.vercel.app";
 const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 const description = "Hue leaves home. Collect every coin as fast as you can and help him make it outside. A game by Gest, Lower Manhattan.";
 
