@@ -19,6 +19,7 @@ import { GamepadDirector } from "./input/GamepadDirector";
 import { useHotkeys } from "./input/hotkeys";
 import { DebugView } from "./DebugView";
 import { Effects } from "./Effects";
+import { installGrade } from "./fx/grade";
 import { CAMERA } from "./config";
 import { COIN_NODE } from "./levels";
 import { Hue } from "./Hue";
@@ -110,6 +111,9 @@ function GraphicsMessage({ text, action }: { text: string; action?: { label: str
     </div>
   );
 }
+
+// The phone colour grade has to be in place before the first material compiles.
+installGrade();
 
 export default function Game() {
   const [webgl] = useState(hasWebGL);

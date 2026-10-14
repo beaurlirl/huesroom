@@ -215,6 +215,13 @@ export const CANS = {
 
 export const BLOOM = { threshold: 2.2, intensity: 0.8 };
 
+/**
+ * Colour grade for the street (fx/grade.ts). The street's pale, hazy palette read about 45% less saturated than the room (mean saturation
+ * 0.22 against 0.40 in matching frames), so it gets a lift. The numbers mean what they do in the postprocessing library's HueSaturation
+ * and BrightnessContrast effects (0 = off, 1 = the most); the phone path applies the same formulas inside the materials' shaders.
+ */
+export const GRADE = { saturation: 0.28, contrast: 0.05, brightness: -0.02 };
+
 /** Street shimmer made steadier (see fx/steady.ts): how much blurrier than the exact mip level colour maps are sampled (mip levels). 0 = off. */
 export const STEADY = { mipBias: 0.5 };
 
