@@ -124,6 +124,8 @@ export function CameraRig() {
     /** A chase shot's x: it trails Hue, eased. */
     sx: 0,
     vsx: { v: 0 },
+    /** The followX shot `sx` belongs to: a followX camera starts from where the camera is when its shot comes on (not from where it last was). */
+    sxShot: null as object | null,
     /** Sight blockers for the keep-in-view guard (colliders flagged `view_block`), and the lift/slide it is applying now. */
     blockers: null as null | { x0: number; x1: number; y0: number; y1: number; z0: number; z1: number }[],
     gx: 0,
@@ -277,6 +279,7 @@ export function CameraRig() {
       st.shot = s0;
       st.shotW = s0 ? 1 : 0;
       st.sx = s0?.followX ? runtime.feet.x + s0.pos[0] : 0;
+      st.sxShot = s0?.followX ? s0 : null;
       st.vsx.v = 0;
       st.shotFov = s0?.fov ?? 0;
       st.heading = 0; // the run starts facing +x (down the shop)
@@ -370,6 +373,7 @@ export function CameraRig() {
       }
     }
     const sw = st.shot ? st.shotW * st.shotW * (3 - 2 * st.shotW) : 0;
+    if (!(st.shot && sw > 0 && st.shot.followX && !st.shot.chase)) st.sxShot = null; // a followX camera starts afresh from the camera each time its shot comes on
     if (st.shot && sw > 0) {
       // A shot may change as the run goes on (levels.ts `pos2`): the wide opening closes in behind Hue as he walks away from where he began.
       const sh = st.shot;
@@ -383,6 +387,11 @@ export function CameraRig() {
         // Trail behind him, whichever way he is going.
         shotX = f.x - Math.cos(st.heading) * sh.chase.dist;
         shotZ = f.z - Math.sin(st.heading) * sh.chase.dist;
+        const bx = sh.chase.box;
+        if (bx) {
+          shotX = clamp(shotX, bx.x0 ?? -Infinity, bx.x1 ?? Infinity);
+          shotZ = clamp(shotZ, bx.z0 ?? -Infinity, bx.z1 ?? Infinity);
+        }
         // When he turns back, the camera has to get round to his other side: it rises up and over (so it never swings through the shelves), then comes down.
         const turn = Math.abs(Math.atan2(Math.sin(st.want - st.heading), Math.cos(st.want - st.heading)));
         let wantH = sh.chase.height + (sh.chase.arc ?? 0) * Math.min(1, turn / (Math.PI * 0.6));
@@ -408,6 +417,11 @@ export function CameraRig() {
         }
         shotY = f.y + st.ch;
       } else if (sh.followX) {
+        if (st.sxShot !== sh) {
+          st.sx = camera.position.x;
+          st.vsx.v = 0;
+          st.sxShot = sh;
+        }
         st.sx = smoothDamp(st.sx, f.x + pos[0], st.vsx, cam.smoothX * 0.6, dt);
         shotX = st.sx;
       }

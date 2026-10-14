@@ -2,7 +2,8 @@
 // Needs the dev server:  npx next dev -p 3100     then:  node tests/camera-deli.mjs
 // "Clear" = a ray from the camera to Hue's chest hits none of the model's opaque meshes. If something is in the way he is still seen (the level's x-ray silhouette
 // draws him through it): reported as XRAY, which passes, so the numbers show how often the camera alone could not see him. Chase-camera spots are walked into (the camera follows his heading), high
-// spots are teleported to (no chase there).
+// spots are teleported to (no chase there). Then he is walked round both ends of the middle shelf, in both directions, and the camera must stay in the aisle air the whole way:
+// never inside a fixture and never over the middle shelf (it follows him round the corner at his head level instead of hopping over).
 import { chromium } from 'playwright-core';
 const URL = process.env.URL || 'http://localhost:3100/?level=deli&test';
 const browser = await chromium.launch({ executablePath: `${process.env.HOME}/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing`, args: ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'] });
@@ -58,6 +59,44 @@ const rows = await page.evaluate(async () => {
   return out;
 });
 
+// Round the middle shelf: the two ends join the left aisle (behind it) to the customer aisle (in front). [label, start, waypoints]
+const loops = await page.evaluate(async () => {
+  const h = window.__hue, R = h.runtime;
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const mid = h.colliders.find((c) => c.name === 'COL_Median shelf');
+  const overMid = (c) => c.x >= mid.center.x - mid.halfExtents.x - 0.03 && c.x <= mid.center.x + mid.halfExtents.x + 0.03 && c.z >= mid.center.z - mid.halfExtents.z - 0.03 && c.z <= mid.center.z + mid.halfExtents.z + 0.03;
+  const fixtureAt = (c) => h.colliders.filter((k) => !k.userData.ladder && !k.userData.door && k.userData.standable !== false && k.halfExtents.y * 2 < 2.4 && c.x >= k.center.x - k.halfExtents.x - 0.02 && c.x <= k.center.x + k.halfExtents.x + 0.02 && c.z >= k.center.z - k.halfExtents.z - 0.02 && c.z <= k.center.z + k.halfExtents.z + 0.02 && c.y <= k.center.y + k.halfExtents.y + 0.1).map((k) => k.name.replace('COL_', ''));
+  const legs = [
+    ['east end: left aisle -> customer aisle', [0.2, -1.3], [[1.7, -1.3], [1.8, -0.3], [1.8, 0.45], [0.2, 0.45]]],
+    ['east end: customer aisle -> left aisle', [0.2, 0.45], [[1.8, 0.45], [1.8, -0.3], [1.7, -1.3], [0.2, -1.3]]],
+    ['west end: customer aisle -> left aisle', [-1.0, 0.45], [[-2.45, 0.45], [-2.45, -0.3], [-2.45, -1.2], [-1.0, -1.2]]],
+    ['west end: left aisle -> customer aisle', [-1.0, -1.2], [[-2.45, -1.2], [-2.45, -0.3], [-2.45, 0.45], [-1.0, 0.45]]],
+    ['west end: turning back in the gap', [-2.45, 0.45], [[-2.45, -0.3], [-2.45, 0.3], [-2.45, -0.4], [-2.45, 0.35]]],
+    ['east end: turning back in the gap', [1.75, 0.4], [[1.75, -0.4], [1.75, 0.3], [1.75, -0.5], [1.75, 0.35]]],
+  ];
+  const out = [];
+  for (const [label, start, pts] of legs) {
+    R.debug.input = null; R.debug.teleport(start[0], 0.02, start[1], 0); await sleep(3500); // the camera settles first (it may be coming down from a high spot)
+    let n = 0, over = 0, inside = new Set(), maxJump = 0, last = null, maxY = 0;
+    for (const p of pts) {
+      const t0 = performance.now();
+      while (performance.now() - t0 < 6000) {
+        const dx = p[0] - R.feet.x, dz = p[1] - R.feet.z, d = Math.hypot(dx, dz);
+        if (d < 0.1) break;
+        R.debug.input = { x: dx / d, z: dz / d, run: false, jump: false }; await sleep(40);
+        const c = R.cameraPos; n++;
+        if (overMid(c)) over++;
+        fixtureAt(c).forEach((f) => inside.add(f));
+        if (last) maxJump = Math.max(maxJump, Math.hypot(c.x - last.x, c.y - last.y, c.z - last.z));
+        last = c.clone(); maxY = Math.max(maxY, c.y);
+      }
+    }
+    R.debug.input = null;
+    out.push({ label, n, over, inside: [...inside].join('+'), maxY: +maxY.toFixed(2), maxJump: +maxJump.toFixed(2) });
+  }
+  return out;
+});
+
 let bad = 0, xray = 0;
 const xrayOn = await page.evaluate(() => !!window.__hue.level().xray);
 for (const r of rows) {
@@ -67,7 +106,12 @@ for (const r of rows) {
   if (viaXray) xray++;
   console.log(`${problems.length ? 'FAIL' : viaXray ? 'XRAY' : 'PASS'}  ${r.label.padEnd(22)} cam ${r.cam}${problems.length ? '   ' + problems.join('; ') : viaXray ? `   behind ${r.hidden} (seen through the silhouette)` : ''}`);
 }
+for (const l of loops) {
+  const problems = [l.over && `camera OVER the middle shelf in ${l.over} of ${l.n} samples`, l.inside && `camera INSIDE ${l.inside}`, l.maxY > 1.7 && `camera rose to ${l.maxY} m`].filter(Boolean);
+  if (problems.length) bad++;
+  console.log(`${problems.length ? 'FAIL' : 'PASS'}  ${l.label.padEnd(40)} highest camera ${l.maxY} m, biggest step ${l.maxJump} m${problems.length ? '   ' + problems.join('; ') : ''}`);
+}
 console.log(errors.length ? '\nbrowser errors:\n' + [...new Set(errors)].join('\n') : '\nno browser errors');
-console.log(`\n${rows.length - bad - xray} clear, ${xray} seen through the x-ray silhouette, ${bad} failing, of ${rows.length} spots`);
+console.log(`\n${rows.length + loops.length - bad - xray} clear, ${xray} seen through the x-ray silhouette, ${bad} failing, of ${rows.length} spots and ${loops.length} walks round the middle shelf`);
 await browser.close();
 process.exit(bad || errors.length ? 1 : 0);

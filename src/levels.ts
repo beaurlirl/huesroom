@@ -34,7 +34,7 @@ export type LevelCamera = Partial<typeof CAMERA> & {
    * (a chase shot). A shot flagged `once` is the opening: the run starts in it (if Hue starts inside its zone), and it is gone for
    * good as soon as he walks out.
    */
-  shots?: { x0: number; x1: number; z0: number; z1: number; pos: [number, number, number]; /** A chase shot: the camera stays `dist` metres behind Hue, whichever way he is heading (it turns with him around corners), `height` above his feet. `pos` is then only the shot's resting place. */ chase?: { dist: number; height: number; /** Extra height (m) while the camera has to swing right round to get behind him again (he turned back): it rises up and over, then comes down. */ arc?: number; /** Extra height that fades in as Hue's x goes from `from` to `to` (the front end of the shop: the camera is higher there). */ lift?: { from: number; to: number; extra: number } }; /** After Hue has walked `dist` (m) from where the run began, `pos` and `fov` ease to `pos2` and `fov2` (the wide opening becomes a close follow). */ pos2?: [number, number, number]; fov2?: number; dist?: number; /** Only while Hue's feet are below this height (climbing out of the zone ends the shot). */ y1?: number; once?: boolean; fov?: number; followX?: boolean; cutaway?: string }[];
+  shots?: { x0: number; x1: number; z0: number; z1: number; pos: [number, number, number]; /** A chase shot: the camera stays `dist` metres behind Hue, whichever way he is heading (it turns with him around corners), `height` above his feet. `pos` is then only the shot's resting place. */ chase?: { dist: number; height: number; /** Extra height (m) while the camera has to swing right round to get behind him again (he turned back): it rises up and over, then comes down. */ arc?: number; /** Keeps the camera's spot inside this box (any side left out is free): it stays in an aisle instead of riding up over a shelf. */ box?: { x0?: number; x1?: number; z0?: number; z1?: number }; /** Extra height that fades in as Hue's x goes from `from` to `to` (the front end of the shop: the camera is higher there). */ lift?: { from: number; to: number; extra: number } }; /** After Hue has walked `dist` (m) from where the run began, `pos` and `fov` ease to `pos2` and `fov2` (the wide opening becomes a close follow). */ pos2?: [number, number, number]; fov2?: number; dist?: number; /** Only while Hue's feet are below this height (climbing out of the zone ends the shot). */ y1?: number; once?: boolean; fov?: number; followX?: boolean; cutaway?: string }[];
   /** Zones where the camera has to be at least this high (feet inside x0..x1, z0..z1): to look over low equipment that stands between it and Hue. */
   rise?: { x0: number; x1: number; z0: number; z1: number; y: number }[];
 };
@@ -159,6 +159,10 @@ export const LEVELS: readonly LevelDef[] = [
         // The pocket of the ice-cream freezer in the left aisle's side: its end wall faces the aisle, so the aisle camera cannot see in. Here the camera
         // looks at the open door from across the shop, from beside the end of the middle shelf.
         { x0: -2.45, x1: -1.35, z0: -2.5, z1: -1.85, y1: 0.9, pos: [-2.9, 1.2, 2.39] },
+        // Round the two ends of the middle shelf (the gaps that join the left aisle to the customer aisle): the camera stays at his head level and follows
+        // closely behind him round the corner, in the aisle air, so it never swings up and over the shelf to get to the other side.
+        { x0: -3.0, x1: -1.9, z0: -0.72, z1: 0.82, y1: 0.9, pos: [-2.5, 0.8, -1.3], chase: { dist: 1.05, height: 0.6, arc: 0.9, box: { x0: -2.85, x1: -2.1, z0: -1.55, z1: 0.7 } }, fov: 62 },
+        { x0: 1.23, x1: 2.55, z0: -0.72, z1: 0.77, y1: 0.9, pos: [1.6, 0.8, -1.3], chase: { dist: 1.05, height: 0.6, arc: 0.9, box: { x0: 1.35, x1: 2.3, z0: -1.55, z1: 0.7 } }, fov: 62 },
         // The left aisle (from the front door to the back wall): the camera trails behind Hue. The run opens high up and wide (about an ultra-wide
         // 0.5x), outside the doorway with him facing the back wall, so how small he is in the shop shows; as he walks it comes in close and low behind
         // him, so the shelves tower over him and how big they are to climb shows. From the open side the tall shelves and register cabinets would
@@ -174,7 +178,7 @@ export const LEVELS: readonly LevelDef[] = [
         // chase, high, so it looks over the counter and the donut display instead of dropping to the steep wall camera.
         { x0: -3.9, x1: -3.3, z0: 0.4, z1: 1.4, y1: 1.0, pos: [-3.6, 1.5, 0.2], chase: { dist: 1.3, height: 1.4, arc: 0.8 }, fov: 60 },
         // (The corner is the one angle at his head level: close behind him, low, in the narrow gap.)
-        { x0: 1.55, x1: 2.55, z0: 0.22, z1: 1.4, y1: 1.0, pos: [1.95, 0.5, 1.4], chase: { dist: 1.15, height: 0.42, arc: 1.5 }, fov: 62 },
+        { x0: 1.55, x1: 2.55, z0: 0.77, z1: 1.4, y1: 1.0, pos: [1.95, 0.5, 1.4], chase: { dist: 1.15, height: 0.42, arc: 1.5, box: { x0: 2.12, x1: 2.3 } }, fov: 62 },
         // The customer side of the deli case (the aisle between it and the middle shelf): the camera stands at the back end of the aisle, with the
         // liquor cooler behind it, and looks down the aisle toward the front, the case on one side and the middle shelf on the other, so the cold cuts and
         // cheese (and the dome opening) show as Hue walks along them.
