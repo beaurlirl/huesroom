@@ -13,6 +13,7 @@ import { isRunning, runtime, useGame } from "./store";
 import { useHueController } from "./useHueController";
 import { theme } from "./ui/theme";
 import { useLevel, useRoom } from "./useLevel";
+import { roomColliders } from "./Room";
 
 const IDLE_INPUT = { moveX: 0, moveZ: 0, run: false, jump: false };
 
@@ -185,6 +186,9 @@ export function Hue() {
     };
   }, [controller, anim]);
 
+  // Below every collider in the level there is nothing left to land on: he fell out of the world (a gap in a wall, a ledge over the edge). Back to the start, not into the void.
+  const fallY = useRef<number | null>(null);
+
   useFrame((_, rawDt) => {
     if (!isRunning()) return;
     const dt = Math.min(rawDt, 1 / 30);
@@ -194,6 +198,11 @@ export function Hue() {
       const scripted = runtime.debug.input;
       const input = scripted ? { moveX: scripted.x, moveZ: -scripted.z, run: scripted.run, jump: scripted.jump } : readInput();
       mover.update(dt, phase === "playing" ? input : IDLE_INPUT);
+      if (fallY.current === null && roomColliders.length) fallY.current = Math.min(...roomColliders.map((c) => c.center.y - c.halfExtents.y)) - 1;
+      if (fallY.current !== null && mover.feet.y < fallY.current) {
+        mover.place(startFeet, spawn.yaw);
+        anim.play("idle", { fade: 0 });
+      }
       runtime.debug.mode = mover.mode;
       runtime.debug.probe = mover.debugProbe;
       root.position.copy(mover.feet);

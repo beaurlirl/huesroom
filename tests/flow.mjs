@@ -17,7 +17,13 @@ await page.waitForFunction(() => window.__hue?.useGame.getState().phase === 'rea
 await page.keyboard.press('Space');
 await page.waitForFunction(() => window.__hue.useGame.getState().phase === 'playing', null, { timeout: 10000 });
 
-// 1. The jump key must not skip the win screen: a player who is still jumping as they grab the last coin would restart the level before they ever saw their time.
+// 1. Falling out of the world puts him back at the start instead of dropping him through the void with the clock running.
+await page.evaluate(() => window.__hue.runtime.debug.teleport(0.5, -6, 0.2, 90));
+await page.waitForTimeout(700);
+const back = await page.evaluate(() => { const r = window.__hue.runtime; return { feet: r.feet.toArray().map((v) => +v.toFixed(2)), start: r.startFeet.toArray().map((v) => +v.toFixed(2)), phase: window.__hue.useGame.getState().phase }; });
+check('falling below the level puts him back at the start', Math.hypot(back.feet[0] - back.start[0], back.feet[2] - back.start[2]) < 0.1 && Math.abs(back.feet[1] - back.start[1]) < 0.1 && back.phase === 'playing', JSON.stringify(back));
+
+// 2. The jump key must not skip the win screen: a player who is still jumping as they grab the last coin would restart the level before they ever saw their time.
 const coins = [[0.15,0.18,1.18],[0.675,0.843,-0.942],[0.07,0.577,0.23],[-0.735,1.173,0.94],[-0.735,0.69,-0.23],[-0.235,0.543,-1.219],[0.88,1.283,-1.422],[1.115,1.702,-0.2],[-0.989,0.69,-1.219],[-0.95,2.158,-1.33],[0.809,2.3,1.12]];
 for (const [x, y, z] of coins) { await page.evaluate(([x, y, z]) => window.__hue.runtime.debug.teleport(x, y - 0.25, z, -90), [x, y, z]); await page.waitForTimeout(120); }
 await page.waitForFunction(() => window.__hue.useGame.getState().phase === 'won', null, { timeout: 5000 });
@@ -28,6 +34,7 @@ await page.keyboard.press('Enter');
 await page.waitForTimeout(400);
 check('Enter right after the last coin does not skip it either', (await phase()) === 'won', `phase ${await phase()}`);
 await page.getByRole('button', { name: /play again/i }).waitFor({ timeout: 10000 });
+await page.waitForTimeout(500);
 await page.keyboard.press('Space');
 await page.waitForFunction(() => ['resetting', 'intro', 'ready'].includes(window.__hue.useGame.getState().phase), null, { timeout: 3000 }).then(
   () => check('once the results are showing, Space plays again', true),
