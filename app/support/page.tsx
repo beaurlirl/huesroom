@@ -11,7 +11,7 @@ export default function Support() {
     <LegalPage title="Support">
       <Section title="The game">
         <p>
-          Hue leaves home and runs, climbs and jumps through real places in Lower Manhattan, collecting every coin as fast as he can.
+          Hue runs, climbs and jumps through real places in Lower Manhattan, collecting every coin as fast as he can.
           There is no losing: coins always count, and a faster run earns a bonus.
         </p>
       </Section>
