@@ -1,8 +1,9 @@
 # hue's room
 
 A small 3D platformer for the web and iOS: Hue (0.457 m tall) climbs, jumps, bounces and kicks
-things around a level, collecting its coins against the clock. One level so far (his room, 11
-coins); levels are data, see [Levels](#levels). Agents: read [AGENTS.md](AGENTS.md) first.
+things around a level, collecting its coins against the clock. Three levels so far (his room, 11
+coins; Ludlow Street, 17; the deli, 13); levels are data, see [Levels](#levels). The game's name
+is one line, `src/brand.ts`. Agents: read [AGENTS.md](AGENTS.md) first.
 
 Next.js 16 · React 19 · three 0.182 · @react-three/fiber 9 · drei 10 · @react-three/rapier 2 ·
 @react-three/postprocessing · zustand · Tailwind 4.
@@ -62,15 +63,26 @@ lighting rig in `Lighting.tsx`, the win line ("hue made it outside"), and the si
 
 ## Tests
 
-Both need the dev server on port 3100 (`npx next dev -p 3100`) and use the Playwright Chromium
+All need the dev server on port 3100 (`npx next dev -p 3100`) and use the Playwright Chromium
 in `~/Library/Caches/ms-playwright`.
 
 ```bash
 npm run test:routes    # every route in prompt 1.5, via teleport + scripted input (18 legs)
 npm run test:qa        # 30 end-to-end checks: intro lock, timer, keyboard play, pause, restart,
                        # win + best time, pose monitor, audio, touch UI, console errors
+npm run test:street    # level 2: the level checks and its 27 route legs
+npm run test:deli      # level 3: the camera spots and the ladders
+npm run test:flow      # the win screen's keys, falling out of the world, the deli's wall height
+npm run test:reach     # virtual time: every level's recorded route collects every coin and wins;
+                       # a jump is the same height at 30, 60, 120 and 240 fps
 URL="http://localhost:3200/huesroom/?test" npm run test:qa   # against a sub-path build
 ```
+
+**Virtual time** (`tests/vt.mjs`) runs the real game frame by frame at a fixed step, about five
+times faster than real time and identical every run. `tests/explore.mjs` uses it to search every
+level for what Hue can reach (and any hole in the level) with the real physics, and
+`tests/reach-tour.mjs` turns what it found into the route that `test:reach` replays
+(`tests/reach/<level>.json`). Run those two again when a level's model changes.
 
 ## Where things are
 

@@ -71,10 +71,11 @@ function ExposeWorld() {
   const gl = useThree((s) => s.gl);
   const scene = useThree((s) => s.scene);
   const raycaster = useThree((s) => s.raycaster);
+  const camera = useThree((s) => s.camera);
   useEffect(() => {
     const w = window as unknown as { __hue?: Record<string, unknown> };
-    if (w.__hue) Object.assign(w.__hue, { world, gl, scene, raycaster });
-  }, [world, gl, scene, raycaster]);
+    if (w.__hue) Object.assign(w.__hue, { world, gl, scene, raycaster, camera });
+  }, [world, gl, scene, raycaster, camera]);
   return null;
 }
 

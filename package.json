@@ -15,6 +15,7 @@
     "export:app": "rm -rf out && STATIC_EXPORT=1 next build",
     "test:grade": "node tests/grade.mjs",
     "test:flow": "node tests/flow.mjs",
+    "test:reach": "node tests/reach.mjs",
     "test:pages": "node tests/pages.mjs",
     "test:street": "node tests/street.mjs && LEVEL=street node tests/routes.mjs tests/routes-street.json",
     "test:deli": "node tests/camera-deli.mjs && node tests/ladders-deli.mjs"

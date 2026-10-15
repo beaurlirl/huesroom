@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# reachability explorer raw output (large; regenerate with tests/explore.mjs)
+/tests/reach/raw/
