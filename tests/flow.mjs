@@ -105,6 +105,14 @@ await page.waitForFunction(() => ['resetting', 'intro', 'ready'].includes(window
   await jp.keyboard.up('Space');
   check('holding Space to begin does not make him jump', held < 0.05, `rose ${held.toFixed(3)} m while the begin key was held`);
   check('pressing it again does', again > 0.4, `rose ${again.toFixed(3)} m`);
+  // ... and the Space that resumes a paused game is not a jump either.
+  await jp.waitForTimeout(1500);
+  await jp.keyboard.press('Escape');
+  await jp.waitForFunction(() => window.__hue.useGame.getState().paused, null, { timeout: 3000 });
+  await jp.keyboard.down('Space');
+  const resumed = await rise(800);
+  await jp.keyboard.up('Space');
+  check('the Space that resumes a paused game does not make him jump', resumed < 0.05 && !(await jp.evaluate(() => window.__hue.useGame.getState().paused)), `rose ${resumed.toFixed(3)} m`);
   await jctx.close();
 }
 

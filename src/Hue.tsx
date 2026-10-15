@@ -190,7 +190,10 @@ export function Hue() {
   const fallY = useRef<number | null>(null);
 
   useFrame((_, rawDt) => {
-    if (!isRunning()) return;
+    if (!isRunning()) {
+      controller.get()?.disarmJump();
+      return;
+    }
     const dt = Math.min(rawDt, 1 / 30);
     const phase = useGame.getState().phase;
     const mover = controller.get();

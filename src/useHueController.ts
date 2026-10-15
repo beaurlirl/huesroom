@@ -160,6 +160,11 @@ class HueMover {
     this.ray = new rapier.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: -1, z: 0 });
   }
 
+  /** The game is paused (or between runs): a jump key still held when it comes back has to be let go first, so the Space that resumes is not also a jump. */
+  disarmJump() {
+    this.jumpArmed = false;
+  }
+
   /** Places the capsule at `feet` (used when control starts and on reset). */
   place(feet: THREE.Vector3, yaw: number) {
     this.feet.copy(feet);
