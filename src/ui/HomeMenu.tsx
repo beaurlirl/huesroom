@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { AudioSwitches, Btn, Veil } from "../Hud";
 import { LEVELS } from "../levels";
 import { formatTime, readBest, readLedger, useGame } from "../store";
 import { GLASS } from "./Frost";
+import { focusMenuPrimary, moveMenuFocus } from "./menuNav";
 import { theme } from "./theme";
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
@@ -40,9 +41,27 @@ export function HomeMenu() {
     }
   };
 
+  // Without a mouse: the location that loaded has focus once the menu is up, and the arrow keys (or the pad's D-pad, see GamepadDirector) move between the buttons.
+  useEffect(() => {
+    if (!open) return;
+    const focus = setTimeout(focusMenuPrimary, 700);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.code === "ArrowDown" || e.code === "ArrowRight") moveMenuFocus(1);
+      else if (e.code === "ArrowUp" || e.code === "ArrowLeft") moveMenuFocus(-1);
+      else return;
+      e.preventDefault();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      clearTimeout(focus);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
   return (
     <Veil open={open} ms={600} right="menu">
-      <div className="flex w-full max-w-md flex-col gap-6">
+      <div data-menu className="flex w-full max-w-md flex-col gap-6">
         <span className="text-5xl font-bold leading-[0.9] sm:text-7xl" style={{ animation: GLASS.in(0.8, 0.1) }}>
           {theme.wordmark}
         </span>
@@ -57,7 +76,7 @@ export function HomeMenu() {
                 {done ? "all coins · " : ""}
                 {best !== null ? `best ${formatTime(best)}` : "not played"}
               </span>
-              <Btn onClick={() => play(level.id)}>{level.id === levelId ? "play" : "go"}</Btn>
+              <Btn primary={level.id === levelId} onClick={() => play(level.id)}>{level.id === levelId ? "play" : "go"}</Btn>
             </li>
           ))}
         </ul>

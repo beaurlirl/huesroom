@@ -21,6 +21,17 @@ check('nothing played yet says so', (text.match(/not played/g) ?? []).length ===
 check('it has no "press any key" prompt under it', !text.includes('press any key'));
 if (shotDir) await page.screenshot({ path: `${shotDir}/menu.png` });
 
+// 1b. Without a mouse: the location that loaded has focus, the arrow keys walk the buttons.
+const focused = () => page.evaluate(() => (document.activeElement?.textContent ?? '').toLowerCase());
+await page.waitForFunction(() => (document.activeElement?.matches('button') && (document.activeElement.textContent ?? '').toLowerCase().includes('play')), null, { timeout: 8000 }).then(
+  () => check('the play button has focus once the menu is up', true),
+  async () => check('the play button has focus once the menu is up', false, `focus is on "${await focused()}"`),
+);
+await page.keyboard.press('ArrowDown');
+check('ArrowDown moves focus to the next location', (await focused()).includes('go'), `"${await focused()}"`);
+await page.keyboard.press('ArrowUp');
+check('ArrowUp moves it back', (await focused()).includes('play'), `"${await focused()}"`);
+
 // 2. Sound switches.
 const label = () => page.getByRole('button', { name: /sound (on|off)/i }).first().innerText();
 const before = (await label()).toLowerCase();
@@ -52,6 +63,17 @@ await page.getByText('coins', { exact: false }).first().waitFor({ timeout: 20000
 await page.waitForTimeout(2500);
 const hud = (await page.locator('body').innerText()).toLowerCase();
 check('play starts the run (the coin counter shows)', /\d\d\s*\/\s*11/.test(hud), hud.replace(/\n/g, ' ').slice(0, 120));
+
+// 4b. Enter on the focused play button begins it too (the keyboard way in).
+await page.goto(BASE + '/');
+await page.getByRole('link', { name: 'privacy' }).waitFor({ timeout: 90000 });
+await page.waitForFunction(() => (document.activeElement?.matches('button') && (document.activeElement.textContent ?? '').toLowerCase().includes('play')), null, { timeout: 8000 });
+await page.keyboard.press('Enter');
+await page.waitForFunction(() => /\d\d\s*\/\s*11/.test(document.body.innerText), null, { timeout: 30000 }).then(
+  () => check('Enter on the focused play button starts the run', true),
+  () => check('Enter on the focused play button starts the run', false),
+);
+await page.waitForTimeout(4000); // the rise from the chair
 
 // 5. Pause has a menu button that comes back here.
 await page.keyboard.press('Escape');

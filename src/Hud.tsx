@@ -80,9 +80,9 @@ function Counter() {
   );
 }
 
-export function Btn({ children, onClick, label }: { children: React.ReactNode; onClick: () => void; label?: string }) {
+export function Btn({ children, onClick, label, primary }: { children: React.ReactNode; onClick: () => void; label?: string; primary?: boolean }) {
   return (
-    <button type="button" aria-label={label} onClick={onClick} className="ui-btn pointer-events-auto text-sm">
+    <button type="button" aria-label={label} onClick={onClick} data-primary={primary ? "" : undefined} className="ui-btn pointer-events-auto text-sm">
       {children}
     </button>
   );

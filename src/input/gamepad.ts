@@ -4,12 +4,13 @@
 //   RB / RT      hold to run
 //   A            jump · begin · Play again · resume
 //   Right stick  peek the camera
+//   D-pad / stick  walk the home menu's buttons; A presses the one in focus
 //   Menu (≡)     pause / resume
 //   View (⧉)     restart
 
 const DEADZONE = 0.18;
 const RUN_PUSH = 0.7;
-const BTN = { A: 0, B: 1, X: 2, Y: 3, LB: 4, RB: 5, LT: 6, RT: 7, VIEW: 8, MENU: 9 } as const;
+const BTN = { A: 0, B: 1, X: 2, Y: 3, LB: 4, RB: 5, LT: 6, RT: 7, VIEW: 8, MENU: 9, UP: 12, DOWN: 13 } as const;
 
 export type PadState = {
   connected: boolean;
