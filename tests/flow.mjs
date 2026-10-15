@@ -60,6 +60,33 @@ await page.waitForFunction(() => ['resetting', 'intro', 'ready'].includes(window
   await dctx.close();
 }
 
+// 4. The street's camera stands at the edge of the street (z = +-2.02) and the row of buildings on its side is hidden. A mesh that touches that plane and is not in a row
+// stays in front of the lens: a gate that was left out of its row (its name has "road" in "broad shutter") turned the screen grey wherever Hue crossed in front of it.
+{
+  const sctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const sp = await sctx.newPage();
+  sp.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
+  await sp.goto(URL.replace('?test', '?test&level=street'));
+  await sp.waitForFunction(() => window.__hue?.useGame.getState().phase === 'ready', null, { timeout: 90000 });
+  const bad = await sp.evaluate(() => {
+    const H = window.__hue, out = [];
+    H.scene.updateMatrixWorld(true);
+    H.scene.traverse((o) => {
+      if (!o.isMesh || !o.geometry) return;
+      const nm = o.userData?.name ?? o.name;
+      if (/^COL_|^COIN/.test(nm)) return;
+      for (let p = o; p; p = p.parent) if (p.userData?.row) return;
+      o.geometry.computeBoundingBox();
+      const b = o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld);
+      const touchesPlane = (b.min.z <= -1.88 && b.max.z > -2.1 && b.max.z < 0.5) || (b.max.z >= 1.88 && b.min.z < 2.1 && b.min.z > -0.5); // reaches the plane (not wholly behind it)
+      if (touchesPlane && b.max.x > -14.2 && b.min.x < 7.7 && b.max.y > 0.5) out.push(nm);
+    });
+    return out;
+  });
+  check('street: nothing at the camera planes is left out of its row', bad.length === 0, bad.slice(0, 4).join(', '));
+  await sctx.close();
+}
+
 console.log(errors.length ? '\nbrowser errors:\n' + [...new Set(errors)].join('\n') : '\nno browser errors');
 console.log(`\n${results.filter(Boolean).length}/${results.length} checks passed`);
 await browser.close();
