@@ -7,3 +7,6 @@ export const GAME_NAME = "Hue Leaves Home";
 
 /** The name as the UI writes it: lowercase, like the rest of its text. */
 export const WORDMARK = GAME_NAME.toLowerCase();
+
+/** The name as a file name: the share card's picture is saved as `<this>.png`. */
+export const FILE_SLUG = GAME_NAME.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");

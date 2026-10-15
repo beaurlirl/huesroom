@@ -3,6 +3,7 @@
 import { useThree } from "@react-three/fiber";
 import { useEffect, useState } from "react";
 import * as THREE from "three";
+import { FILE_SLUG } from "./brand";
 import { BASE_PATH, CAMERA, HUE } from "./config";
 import { formatTime, runtime, useGame } from "./store";
 import { theme } from "./ui/theme";
@@ -204,7 +205,7 @@ export function ShareButton() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "hue-leaves-home.png";
+    a.download = `${FILE_SLUG}.png`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 5000);
     try {
@@ -221,7 +222,7 @@ export function ShareButton() {
     try {
       const blob = card?.time === result.time ? card.blob : await renderShareCard(result.time);
       if (!blob) return;
-      const file = new File([blob], "hue-leaves-home.png", { type: "image/png" });
+      const file = new File([blob], `${FILE_SLUG}.png`, { type: "image/png" });
       const text = shareCaption(result.time);
       // Phones get the share sheet (Instagram Stories/Feed/DM live there). Desktop browsers
       // may support file sharing too, but the prompt wants download + caption there.
