@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useGame } from "../store";
+import { useGame, winConfirmReady } from "../store";
 
 /** R restarts, Esc/P pause, Space/Enter confirm menus; hiding the tab pauses. */
 export function useHotkeys() {
@@ -12,7 +12,7 @@ export function useHotkeys() {
       } else if ((e.code === "Escape" || e.code === "KeyP") && g.phase === "playing") {
         g.setPaused(!g.paused);
       } else if ((e.code === "Space" || e.code === "Enter") && g.phase === "won") {
-        g.restart();
+        if (winConfirmReady()) g.restart();
       } else if ((e.code === "Space" || e.code === "Enter") && g.paused) {
         g.setPaused(false);
       }

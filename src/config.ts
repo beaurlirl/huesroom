@@ -317,4 +317,6 @@ export const OUTRO = {
   titleOut: 0.6,
   /** Gap between each results row condensing in. */
   stagger: 0.18,
+  /** Seconds after the win before Space / Enter / A mean "play again": the title holds, dissolves, and the buttons are up. */
+  confirmAfter: 3.0 + 0.6 + 0.5,
 };

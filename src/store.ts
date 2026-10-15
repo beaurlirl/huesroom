@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { create } from "zustand";
 import type { Reward } from "./economy";
+import { OUTRO } from "./config";
 import { applyRun, EMPTY_LEDGER, parseLedger, walletOf, type Ledger } from "./ledger";
 import { bestKey, LEDGER_KEY, LEVELS, levelById } from "./levels";
 
@@ -94,6 +95,8 @@ type GameState = {
   goToMenu: () => void;
   /** A line to show over the game for as long as it is true (a locked coin's reason), or null. */
   hint: string | null;
+  /** When the run was won (performance.now), so the jump and confirm keys can wait for the results before they mean "play again". */
+  wonAt: number;
   /** Final time of the last win, and the best time after it. */
   result: { time: number; best: number; isBest: boolean; reward: Reward; wallet: number } | null;
   setPhase: (phase: Phase) => void;
@@ -118,6 +121,7 @@ export const useGame = create<GameState>((set, get) => ({
   totalCoins: 0,
   sceneReady: false,
   result: null,
+  wonAt: 0,
   hint: null,
   menuOpen: initialMenu(),
   setMenuOpen: (menuOpen) => set({ menuOpen }),
@@ -147,7 +151,7 @@ export const useGame = create<GameState>((set, get) => ({
     const isBest = prev === null || time < prev;
     if (isBest) writeBest(levelId, time);
     const { reward, wallet } = bankRun(levelId, time, totalCoins);
-    set({ collected: next, collectedNames: names, phase: "won", result: { time, best: isBest ? time : prev, isBest, reward, wallet } });
+    set({ collected: next, collectedNames: names, phase: "won", wonAt: performance.now(), result: { time, best: isBest ? time : prev, isBest, reward, wallet } });
   },
   restart: () => {
     const { phase, sceneReady } = get();
@@ -212,6 +216,12 @@ export const runtime = {
     input: null as null | { x: number; z: number; run: boolean; jump: boolean },
   },
 };
+
+/** The win screen is showing its results: only then do Space / Enter / the pad's A play again (they are also the jump keys, so a player still jumping when the last coin lands would skip it). */
+export function winConfirmReady() {
+  const { phase, wonAt } = useGame.getState();
+  return phase === "won" && performance.now() - wonAt >= OUTRO.confirmAfter * 1000;
+}
 
 /** Whether the simulation should advance this frame. */
 export function isRunning() {
