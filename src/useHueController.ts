@@ -53,6 +53,11 @@ const GROUND_PROBE = 0.12;
 
 const wrapAngle = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
 const approach = (v: number, target: number, rate: number) => v + (target - v) * Math.min(1, rate);
+/**
+ * The share of the way to a target to move this frame, for smoothing that covers `1 / tau` of the gap per second. Tuned at 60 fps, where it is exactly
+ * `dt / tau` (the old per-frame rate), and the same pace at any other frame rate: a plain `dt / tau` ramps up faster on a 30 fps phone than on a 120 Hz screen.
+ */
+const blend = (tau: number, dt: number) => 1 - Math.pow(1 - Math.min(0.95, 1 / (60 * tau)), dt * 60);
 /** Yaw that turns Hue's local +X (his forward) toward a world XZ direction. */
 const yawFor = (x: number, z: number) => Math.atan2(-z, x);
 
@@ -298,14 +303,14 @@ class HueMover {
 
     // Horizontal velocity.
     if (this.mode === "air") {
-      const rate = (dt / MOVE.accelTime) * 3 * MOVE.airControl;
+      const rate = blend(MOVE.accelTime / (3 * MOVE.airControl), dt);
       if (inputMag > 0) {
         this.vel.x = approach(this.vel.x, dirX * MOVE.airSpeed * inputMag, rate);
         this.vel.z = approach(this.vel.z, dirZ * MOVE.airSpeed * inputMag, rate);
       }
     } else {
       const speed = input.run ? MOVE.runSpeed : MOVE.walkSpeed;
-      const rate = dt / (MOVE.accelTime / 3); // ~95% of the way in accelTime
+      const rate = blend(MOVE.accelTime / 3, dt); // ~95% of the way in accelTime
       this.vel.x = approach(this.vel.x, dirX * speed * inputMag, rate);
       this.vel.z = approach(this.vel.z, dirZ * speed * inputMag, rate);
     }
@@ -313,7 +318,7 @@ class HueMover {
     // Turn toward the input direction.
     if (inputMag > 0.05) {
       const target = yawFor(dirX, dirZ);
-      this.yaw = wrapAngle(this.yaw + wrapAngle(target - this.yaw) * Math.min(1, MOVE.turnRate * dt));
+      this.yaw = wrapAngle(this.yaw + wrapAngle(target - this.yaw) * blend(1 / MOVE.turnRate, dt));
     }
 
     // Ledge climb / ladder: grounded, pushing forward.
@@ -334,10 +339,13 @@ class HueMover {
     // Gravity.
     // Jump arcs (take-off or bounce) use the slower jump gravity; plain falls use normal gravity.
     const g = this.mode === "air" && this.jumped ? MOVE.jumpGravity : MOVE.gravity;
+    const vyStart = this.vel.y;
     this.vel.y = Math.max(this.vel.y - g * dt, -MOVE.maxFallSpeed);
     const vyBefore = this.vel.y;
 
-    const desired = { x: this.vel.x * dt, y: this.vel.y * dt, z: this.vel.z * dt };
+    // The height gained this frame is the average of the speed at its start and its end, so the arc is the true parabola at any frame rate
+    // (stepping with the end speed alone cut a jump's apex from 0.60 m to 0.56 m at 30 fps).
+    const desired = { x: this.vel.x * dt, y: 0.5 * (vyStart + this.vel.y) * dt, z: this.vel.z * dt };
 
     // Roll root motion: follow the forward travel stripped from fall_roll.
     if (this.landing?.kind === "roll") {
@@ -376,7 +384,7 @@ class HueMover {
     if (!this.grounded && this.vel.y > 0 && m.y < desired.y - 1e-4) this.vel.y = 0; // head bump
 
     const actualSpeed = Math.hypot(m.x, m.z) / Math.max(dt, 1e-4);
-    this.speedSmoothed = approach(this.speedSmoothed, actualSpeed, dt * 12);
+    this.speedSmoothed = approach(this.speedSmoothed, actualSpeed, blend(1 / 12, dt));
 
     this.updateMode(dt, wasGrounded, mag, input.run, vyBefore);
     this.publish();
