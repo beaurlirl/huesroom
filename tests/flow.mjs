@@ -41,6 +41,25 @@ await page.waitForFunction(() => ['resetting', 'intro', 'ready'].includes(window
   async () => check('once the results are showing, Space plays again', false, `phase ${await phase()}`),
 );
 
+// 3. The deli's walls are too tall to jump onto: from the pillar beside the left wall he used to reach the wall's top (2.34 m), walk along it and drop out of the level.
+// (The jump itself is replayed in virtual time by npm run test:reach; here it is the data.)
+{
+  const dctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const dp = await dctx.newPage();
+  dp.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
+  await dp.goto(URL.replace('?test', '?test&level=deli'));
+  await dp.waitForFunction(() => window.__hue?.useGame.getState().phase === 'ready', null, { timeout: 90000 });
+  const r = await dp.evaluate(() => {
+    const cols = window.__hue.colliders;
+    const tops = (re) => cols.filter((c) => re.test(c.name)).map((c) => +(c.center.y + c.halfExtents.y).toFixed(2));
+    const shelves = cols.filter((c) => !/wall|Boundary|Rear hallway/.test(c.name) && !c.userData.ladder).map((c) => c.center.y + c.halfExtents.y);
+    return { walls: tops(/wall|Boundary south|Rear hallway/), highestStandable: +Math.max(...shelves).toFixed(2) };
+  });
+  const lowest = Math.min(...r.walls);
+  check('deli: walls are out of reach of a jump from the highest shelf top', lowest >= r.highestStandable + 0.6 + 0.4, `lowest wall top ${lowest} m, highest shelf ${r.highestStandable} m, jump 0.6 m`);
+  await dctx.close();
+}
+
 console.log(errors.length ? '\nbrowser errors:\n' + [...new Set(errors)].join('\n') : '\nno browser errors');
 console.log(`\n${results.filter(Boolean).length}/${results.length} checks passed`);
 await browser.close();
