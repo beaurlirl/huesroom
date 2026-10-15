@@ -118,6 +118,8 @@ class HueMover {
   private lastGroundedAt = 0;
   private jumpPressedAt = -Infinity;
   private prevJump = false;
+  /** False from the moment he is placed (the begin press, a restart) until the jump key has been let go once: the key that began the run is often Space or the pad's A, and must not also be his first jump. */
+  private jumpArmed = false;
   private jumped = false; // this air time started with a jump or bounce
   private shortHopCut = false;
   private doubleUsed = false;
@@ -167,6 +169,7 @@ class HueMover {
     this.grounded = true;
     this.landing = this.climb = this.ladderMove = null;
     this.jumpPressedAt = -Infinity;
+    this.jumpArmed = false;
     // Air-time state too: a restart mid-jump used to leave `jumped` set, which blocks jumping.
     this.jumped = false;
     this.shortHopCut = false;
@@ -276,8 +279,10 @@ class HueMover {
     }
     runtime.steering = mag > 0.1;
     if (mag < 0.1) this.ladderNeedsRelease = false;
-    const jumpPressed = input.jump && !this.prevJump;
-    this.prevJump = input.jump;
+    if (!input.jump) this.jumpArmed = true;
+    const jump = input.jump && this.jumpArmed;
+    const jumpPressed = jump && !this.prevJump;
+    this.prevJump = jump;
     if (jumpPressed) this.jumpPressedAt = this.now;
 
     if (this.mode === "climb") return this.updateClimb(dt, dirX, dirZ, mag);
@@ -296,7 +301,7 @@ class HueMover {
       this.anim.play("jump", { from: CLIP_TIMES.jumpTakeoff, timeScale: CLIP_TIMES.jumpClipScale, holdAt: CLIP_TIMES.jumpAirHold, restart: true, fade: 0.08 });
     }
     // Short hop: releasing Space early cuts the upward speed.
-    if (this.jumped && !this.shortHopCut && !input.jump && this.vel.y > 0) {
+    if (this.jumped && !this.shortHopCut && !jump && this.vel.y > 0) {
       this.vel.y *= 1 - MOVE.shortHopCut;
       this.shortHopCut = true;
     }

@@ -87,6 +87,27 @@ await page.waitForFunction(() => ['resetting', 'intro', 'ready'].includes(window
   await sctx.close();
 }
 
+// 5. The key that begins a run is not also his first jump: holding Space to begin Ludlow St used to launch him off the doorstep the moment he had control
+// (the street and the deli start standing, so control comes at once). Let go and press again, and he jumps.
+{
+  const jctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const jp = await jctx.newPage();
+  jp.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
+  await jp.goto(URL.replace('?test', '?test&level=street'));
+  await jp.waitForFunction(() => window.__hue?.useGame.getState().phase === 'ready', null, { timeout: 90000 });
+  const rise = async (ms) => { let top = -9, lo = 99; const t0 = Date.now(); while (Date.now() - t0 < ms) { const y = await jp.evaluate(() => window.__hue.runtime.feet.y); top = Math.max(top, y); lo = Math.min(lo, y); await jp.waitForTimeout(30); } return top - lo; };
+  await jp.keyboard.down('Space');
+  const held = await rise(900);
+  await jp.keyboard.up('Space');
+  await jp.waitForTimeout(500);
+  await jp.keyboard.down('Space');
+  const again = await rise(700);
+  await jp.keyboard.up('Space');
+  check('holding Space to begin does not make him jump', held < 0.05, `rose ${held.toFixed(3)} m while the begin key was held`);
+  check('pressing it again does', again > 0.4, `rose ${again.toFixed(3)} m`);
+  await jctx.close();
+}
+
 console.log(errors.length ? '\nbrowser errors:\n' + [...new Set(errors)].join('\n') : '\nno browser errors');
 console.log(`\n${results.filter(Boolean).length}/${results.length} checks passed`);
 await browser.close();
