@@ -73,6 +73,8 @@ npm run test:qa        # 30 end-to-end checks: intro lock, timer, keyboard play,
 npm run test:street    # level 2: the level checks and its 27 route legs
 npm run test:deli      # level 3: the camera spots and the ladders
 npm run test:flow      # the win screen's keys, falling out of the world, the deli's wall height
+npm run test:menu      # the home menu: the plain address loads no level (no canvas, no model), the keyboard and
+                       # pad walk it, and choosing a location loads ?level=<id>
 npm run test:reach     # virtual time: every level's recorded route collects every coin and wins;
                        # a jump is the same height at 32, 64, 128 and 256 fps
 URL="http://localhost:3200/huesroom/?test" npm run test:qa   # against a sub-path build

@@ -32,7 +32,6 @@ import { SprayCans } from "./SprayCans";
 import { TouchControls } from "./TouchControls";
 import { runtime, useGame } from "./store";
 import { getLevel, useRoom } from "./useLevel";
-import { HomeMenu } from "./ui/HomeMenu";
 import { Overlay } from "./ui/Overlay";
 import { theme } from "./ui/theme";
 
@@ -223,7 +222,6 @@ export default function Game() {
       <TouchControls />
       <Hud share={<ShareButton />} />
       <Overlay />
-      <HomeMenu />
       {/* Drawn over the (still mounted) scene: unmounting physics mid-frame throws in Rapier. */}
       {contextLost && (
         <GraphicsMessage text="The graphics were reset by the device." action={{ label: "Reload", onClick: () => window.location.reload() }} />
