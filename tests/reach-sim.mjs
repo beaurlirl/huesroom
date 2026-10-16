@@ -1,6 +1,7 @@
 // The actions the reachability explorer and the route replay share, and the in-page simulator that performs one of them in virtual time.
 // An action starts from a rest state (Hue standing still on something) and ends at the next rest state: a walk, a run, a jump or a hop in one of 8 directions.
-export const DT = 1 / 30;
+/** 1/32 s: exactly representable, so the game's own clock steps by exactly this every frame (1/30 is not, and its rounding drifts with how long the page has run). */
+export const DT = 1 / 32;
 
 const DIRS = Array.from({ length: 8 }, (_, i) => { const a = (i * Math.PI) / 4; return [+Math.cos(a).toFixed(4), +Math.sin(a).toFixed(4)]; });
 /** `tIn`: seconds the direction is held; `jump`: seconds the jump key is held; `air`: keep the direction held while he is in the air or landing. */
@@ -62,7 +63,21 @@ export function installSim({ DT, ACTIONS }) {
       if (t > act.tIn && mode === 'ground' && R.grounded && moved < 0.0015 && !D.input.x && !D.input.z) { if (++quiet >= 4) break; } else quiet = 0;
     }
     D.input = { x: 0, z: 0, run: false, jump: false };
-    return { x: R.feet.x, y: R.feet.y, z: R.feet.z, t, picks: [...picks], mode, fell, grounded: R.grounded };
+    // Still at rest a third of a second later? (A spot balanced on a rim, or between two bounces, is not a rest: it slides on.)
+    let steady = true;
+    if (!fell && mode === 'ground' && R.grounded) {
+      const at = [R.feet.x, R.feet.y, R.feet.z];
+      for (let i = 0; i < 11; i++) window.__vt.frame(DT);
+      steady = R.grounded && D.mode === 'ground' && Math.hypot(R.feet.x - at[0], R.feet.y - at[1], R.feet.z - at[2]) < 0.002;
+    }
+    return { x: R.feet.x, y: R.feet.y, z: R.feet.z, t, picks: [...picks], mode: steady ? mode : 'unsteady', fell, grounded: R.grounded && steady };
   };
-  window.__simx = { perform, resetProps, coins, yMin };
+  // The same action from a start nudged by two microns: an edge is only kept if it lands in the same place (rim and bounce outcomes are not repeatable, and a route replay must be).
+  const performRobust = (st, actId) => {
+    const a = perform(st, actId);
+    const b = perform({ x: st.x + 2e-6, y: st.y, z: st.z - 2e-6 }, actId);
+    const same = a.mode === b.mode && a.fell === b.fell && Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z) < 0.003 && a.picks.join() === b.picks.join();
+    return { ...a, robust: same };
+  };
+  window.__simx = { perform, performRobust, resetProps, coins, yMin };
 }

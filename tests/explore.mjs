@@ -56,7 +56,8 @@ await page.evaluate(({ CELL, MAX }) => {
       const k = S.queue.shift(), st = S.visited.get(k);
       S.expanded++;
       for (const id of window.__actIds) {
-        const r = X.perform(st, id);
+        const r = X.performRobust(st, id);
+        if (!r.robust) { S.chaotic = (S.chaotic ?? 0) + 1; continue; }
         S.frames += Math.round(r.t / (1 / 30)) + 4;
         if (r.fell) { S.leaks.push({ from: k, at: [st.x, st.y, st.z], act: id }); continue; }
         if (r.mode !== 'ground' || !r.grounded) { S.stuck.push({ from: k, act: id, mode: r.mode, at: [r.x, r.y, r.z] }); continue; }
@@ -72,7 +73,7 @@ await page.evaluate(({ CELL, MAX }) => {
 }, { CELL, MAX });
 await page.evaluate((ids) => { window.__actIds = ids; }, ACTIONS.map((a) => a.id));
 
-const dump = () => page.evaluate(() => { const S = window.__ex; return { start: S.start, visited: [...S.visited.entries()], edges: S.edges, leaks: S.leaks, stuck: S.stuck.slice(0, 300), coinFirst: S.coinFirst, coins: S.coins, seeds: S.seeds }; });
+const dump = () => page.evaluate(() => { const S = window.__ex; return { start: S.start, visited: [...S.visited.entries()], edges: S.edges, leaks: S.leaks, stuck: S.stuck.slice(0, 300), chaotic: S.chaotic ?? 0, coinFirst: S.coinFirst, coins: S.coins, seeds: S.seeds }; });
 const t0 = Date.now();
 let lastDump = Date.now();
 for (;;) {
@@ -84,7 +85,7 @@ for (;;) {
 const data = await dump();
 fs.writeFileSync(OUT, JSON.stringify(data));
 const reached = new Set(Object.keys(data.coinFirst));
-console.log(`${level}: ${data.visited.length} rest states, ${data.edges.length} timed edges, ${data.leaks.length} holes (actions that ended below the level)`);
+console.log(`${level}: ${data.visited.length} rest states, ${data.edges.length} timed edges, ${data.leaks.length} holes (actions that ended below the level), ${data.chaotic} actions dropped as not repeatable`);
 console.log(`coins reached: ${reached.size} of ${data.coins.length}${data.coins.length === reached.size ? '' : '; NOT reached: ' + data.coins.filter((c) => !reached.has(c.name)).map((c) => c.name).join(' ')}`);
 if (errors.length) console.log('browser errors:', errors.slice(0, 3));
 await browser.close();

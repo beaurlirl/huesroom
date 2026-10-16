@@ -52,13 +52,14 @@ while (collected.size + unreachable.length < coins.length) {
   for (let k = best.edge.from; k !== cur; k = prev.get(k).from) path.unshift(prev.get(k));
   for (const e of path) {
     const s = V.get(e.from);
-    steps.push({ from: [+s.x.toFixed(3), +s.y.toFixed(3), +s.z.toFixed(3)], act: e.act, to: e.end, t: e.t, picks: e.picks.filter((p) => !collected.has(p)) });
+    // the start is kept to a micron: at a roof edge or a coin's pick-up radius a rounded start gives a different landing
+    steps.push({ from: [+s.x.toFixed(6), +s.y.toFixed(6), +s.z.toFixed(6)], act: e.act, to: e.end, t: e.t, picks: e.picks.filter((p) => !collected.has(p)) });
     for (const p of e.picks) collected.add(p);
     total += e.t;
   }
   collected.add(best.coin);
   cur = best.edge.to;
 }
-const out = { level, coins: coins.length, reached: collected.size, unreachable, botSeconds: +total.toFixed(1), steps };
+const out = { level, robust: d.chaotic !== undefined, coins: coins.length, reached: collected.size, unreachable, botSeconds: +total.toFixed(1), steps };
 fs.writeFileSync(new URL(`./reach/${level}.json`, import.meta.url), JSON.stringify(out));
 console.log(`${level}: ${steps.length} steps, ${collected.size}/${coins.length} coins, rest-to-rest bot time ${total.toFixed(1)} s${unreachable.length ? ', NOT reached: ' + unreachable.join(' ') : ''}`);
