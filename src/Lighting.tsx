@@ -29,34 +29,36 @@ function streetSky() {
 /**
  * Env map for the chrome, leather clearcoat, velvet and eyes, plus key/ceiling/fill lights.
  * In a street (level.lighting === "street") the whole rig travels along the street with Hue, and the
- * key light stays on the camera's side, like the open wall of the room.
+ * key light stays on the camera's side, like the open wall of the room. A long interior ("shop") keeps the room's
+ * indoor lights and env map, but the rig follows Hue along the shop and in and out of it.
  */
 export function Lighting() {
   const gl = useThree((s) => s.gl);
   const scene = useThree((s) => s.scene);
   const touch = useIsTouch();
   const level = useLevel();
-  const follow = level.lighting === "street";
+  const outdoor = level.lighting === "street";
+  const follow = level.lighting !== "room";
   const rig = useRef<THREE.Group>(null);
   const key = useRef<THREE.DirectionalLight>(null);
-  const k = follow ? 0.55 : 1; // the street's pale materials need less light than the room's dark ones
+  const k = outdoor ? 0.55 : 1; // the street's pale materials need less light than the room's dark ones
 
   useLayoutEffect(() => {
     const pmrem = new THREE.PMREMGenerator(gl);
     // A street gets a daytime sky: it is the background above the roofs and what the cars, glass and chrome reflect.
     // The room keeps its indoor studio environment.
-    const env = pmrem.fromScene(follow ? streetSky() : new RoomEnvironment(), follow ? 0 : 0.04).texture;
+    const env = pmrem.fromScene(outdoor ? streetSky() : new RoomEnvironment(), outdoor ? 0 : 0.04).texture;
     const before = scene.background;
     scene.environment = env;
-    scene.environmentIntensity = follow ? 0.42 : 0.45;
-    if (follow) scene.background = env;
+    scene.environmentIntensity = outdoor ? 0.42 : 0.45;
+    if (outdoor) scene.background = env;
     return () => {
       scene.environment = null;
-      if (follow) scene.background = before;
+      if (outdoor) scene.background = before;
       env.dispose();
       pmrem.dispose();
     };
-  }, [gl, scene, follow]);
+  }, [gl, scene, outdoor]);
 
   const target = useMemo(() => {
     const o = new THREE.Object3D();
@@ -66,8 +68,11 @@ export function Lighting() {
 
   useFrame(() => {
     if (!follow) return;
-    if (rig.current) rig.current.position.x = runtime.feet.x;
-    if (key.current) key.current.position.z = THREE.MathUtils.lerp(3.6, -3.6, runtime.camFlip);
+    if (rig.current) {
+      rig.current.position.x = runtime.feet.x;
+      if (!outdoor) rig.current.position.z = runtime.feet.z; // a shop is deep as well as long
+    }
+    if (key.current && outdoor) key.current.position.z = THREE.MathUtils.lerp(3.6, -3.6, runtime.camFlip);
   });
 
   return (

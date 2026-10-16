@@ -167,6 +167,10 @@ body {
 .ui-btn:active {
   transform: scale(0.97);
 }
+.ui-btn:focus-visible {
+  outline: 1px solid currentColor;
+  outline-offset: 3px;
+}
 .ui-btn::before {
   content: "(";
 }

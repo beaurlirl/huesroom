@@ -11,7 +11,9 @@ import { ASSETS, CLIP_NAMES, HUE, MOVE, type ClipName } from "./config";
 import { initInput, readInput } from "./input";
 import { isRunning, runtime, useGame } from "./store";
 import { useHueController } from "./useHueController";
+import { theme } from "./ui/theme";
 import { useLevel, useRoom } from "./useLevel";
+import { roomColliders } from "./Room";
 
 const IDLE_INPUT = { moveX: 0, moveZ: 0, run: false, jump: false };
 
@@ -106,6 +108,37 @@ export function Hue() {
     };
   }, [gltf.scene, root, anim, spawn, startFeet, startClip]);
 
+  // X-ray (levels.ts `xray`): a second copy of every one of his meshes, drawn only where something is in front of him (the depth test is flipped, and nudged toward the camera so it never competes with his own surface), in the
+  // brand blue. It shares his skeleton, so it moves with him; the shelves and counters of a crowded level can then never hide him.
+  useLayoutEffect(() => {
+    if (!level.xray) return;
+    const mat = new THREE.MeshBasicMaterial({ color: theme.blue, transparent: true, opacity: 0.45, depthFunc: THREE.GreaterDepth, depthWrite: false, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
+    const ghosts: THREE.Object3D[] = [];
+    const sources: THREE.Mesh[] = [];
+    gltf.scene.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (m.isMesh && m.visible) sources.push(m);
+    });
+    for (const m of sources) {
+      const sk = m as THREE.SkinnedMesh;
+      const g: THREE.Mesh = sk.isSkinnedMesh ? new THREE.SkinnedMesh(m.geometry, mat) : new THREE.Mesh(m.geometry, mat);
+      g.position.copy(m.position);
+      g.quaternion.copy(m.quaternion);
+      g.scale.copy(m.scale);
+      g.renderOrder = 50;
+      g.frustumCulled = false;
+      g.castShadow = false;
+      g.receiveShadow = false;
+      m.parent?.add(g);
+      if (sk.isSkinnedMesh) (g as unknown as THREE.SkinnedMesh).bind(sk.skeleton, sk.bindMatrix);
+      ghosts.push(g);
+    }
+    return () => {
+      for (const g of ghosts) g.removeFromParent();
+      mat.dispose();
+    };
+  }, [gltf.scene, level]);
+
   // Rise on begin; hand over control when sit_to_stand finishes.
   useEffect(() => {
     if (phase !== "rising") return;
@@ -153,8 +186,14 @@ export function Hue() {
     };
   }, [controller, anim]);
 
+  // Below every collider in the level there is nothing left to land on: he fell out of the world (a gap in a wall, a ledge over the edge). Back to the start, not into the void.
+  const fallY = useRef<number | null>(null);
+
   useFrame((_, rawDt) => {
-    if (!isRunning()) return;
+    if (!isRunning()) {
+      controller.get()?.disarmJump();
+      return;
+    }
     const dt = Math.min(rawDt, 1 / 30);
     const phase = useGame.getState().phase;
     const mover = controller.get();
@@ -162,6 +201,11 @@ export function Hue() {
       const scripted = runtime.debug.input;
       const input = scripted ? { moveX: scripted.x, moveZ: -scripted.z, run: scripted.run, jump: scripted.jump } : readInput();
       mover.update(dt, phase === "playing" ? input : IDLE_INPUT);
+      if (fallY.current === null && roomColliders.length) fallY.current = Math.min(...roomColliders.map((c) => c.center.y - c.halfExtents.y)) - 1;
+      if (fallY.current !== null && mover.feet.y < fallY.current) {
+        mover.place(startFeet, spawn.yaw);
+        anim.play("idle", { fade: 0 });
+      }
       runtime.debug.mode = mover.mode;
       runtime.debug.probe = mover.debugProbe;
       root.position.copy(mover.feet);

@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { playSfx } from "./audio/sfx";
 import { BOOKS } from "./config";
-import { pushableBodies } from "./pushables";
+import { noStandBodies, pushableBodies } from "./pushables";
 import { blenderName, colliderMeta } from "./Room";
 import { useGame } from "./store";
 import { useRoom } from "./useLevel";
@@ -20,6 +20,8 @@ type Book = {
   mass: number;
   friction: number;
   restitution: number;
+  /** Hue pushes it but does not stand on it (`no_stand` in the node's data). */
+  noStand: boolean;
 };
 
 /** The two book bodies (also registered as pushables for the controller's kick impulses). */
@@ -47,7 +49,7 @@ export function Books() {
       const name = blenderName(o);
       // Exact node names only: multi-material meshes also have children called BOOK_KICK_01_1, …
       if (!/^BOOK_KICK_\d+$/.test(name)) return;
-      const u = o.userData as { mass_kg?: number; friction?: number; restitution?: number };
+      const u = o.userData as { mass_kg?: number; friction?: number; restitution?: number; no_stand?: boolean };
       // Local bounds (children included), before we move the node into a rigid body.
       const box = new THREE.Box3();
       const inv = new THREE.Matrix4().copy(o.matrixWorld).invert();
@@ -70,6 +72,7 @@ export function Books() {
         mass: u.mass_kg ?? 0.12,
         friction: u.friction ?? 0.6,
         restitution: u.restitution ?? 0.1,
+        noStand: !!u.no_stand,
       });
     });
     // The body now carries the transform; the mesh sits at its origin.
@@ -108,11 +111,13 @@ export function Books() {
             if (prev) {
               bookBodies.delete(prev);
               pushableBodies.delete(prev);
+              noStandBodies.delete(prev);
             }
             bodies.current[i] = body;
             if (body) {
               bookBodies.add(body);
               pushableBodies.add(body);
+              if (b.noStand) noStandBodies.add(body);
             }
           }}
           type="dynamic"

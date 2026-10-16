@@ -19,6 +19,7 @@ export function Overlay() {
   const touch = useIsTouch();
   const runId = useGame((s) => s.runId);
   const sceneReady = useGame((s) => s.sceneReady);
+  const menuOpen = useGame((s) => s.menuOpen);
   const [pad, setPad] = useState(false);
   // Returning players (started the game on this device before) get the quick title card; first-timers see the whole thing.
   const returning = useSyncExternalStore(subscribeNever, playedBeforeAtLoad, () => false);
@@ -61,7 +62,7 @@ export function Overlay() {
 
   // Any key / tap begins.
   useEffect(() => {
-    if (phase !== "ready") return;
+    if (phase !== "ready" || menuOpen) return; // the home menu (when it is up) is where play begins
     const begin = (e: Event) => {
       if (e instanceof KeyboardEvent && (e.repeat || e.metaKey || e.ctrlKey)) return;
       setPhase("rising");
@@ -72,7 +73,7 @@ export function Overlay() {
       window.removeEventListener("keydown", begin);
       window.removeEventListener("pointerdown", begin);
     };
-  }, [phase, setPhase]);
+  }, [phase, setPhase, menuOpen]);
 
   const loading = phase === "loading";
   const white = loading || phase === "resetting" || (phase === "intro" && !leavingCard);
@@ -127,7 +128,7 @@ export function Overlay() {
 
       {/* Begin prompt: a small white-glass chip that condenses in and dissolves on begin. */}
       <div className="absolute inset-x-0 flex justify-center" style={{ bottom: "calc(12vh + env(safe-area-inset-bottom))" }}>
-        {(phase === "ready" || phase === "rising") && (
+        {(phase === "ready" || phase === "rising") && !(menuOpen && phase === "ready") && (
           <span key={runId} className="frost-chip px-5 py-3 text-sm" style={{ animation: phase === "ready" ? GLASS.in(0.7) : GLASS.out(0.45) }}>
             ({prompt})
           </span>

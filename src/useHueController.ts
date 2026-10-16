@@ -7,7 +7,7 @@ import { playSfx } from "./audio/sfx";
 import { sampleCurve, type RootCurve, type TopOutCurve } from "./clips";
 import { BOOKS, CLIMB, CLIP_TIMES, FLAGS, HUE, LANDING, MOVE } from "./config";
 import type { InputSample } from "./input";
-import { pushableBodies } from "./pushables";
+import { noStandBodies, pushableBodies } from "./pushables";
 import { beanbag, colliderMeta, roomColliders, type BoxCollider } from "./Room";
 import { runtime } from "./store";
 
@@ -53,6 +53,11 @@ const GROUND_PROBE = 0.12;
 
 const wrapAngle = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
 const approach = (v: number, target: number, rate: number) => v + (target - v) * Math.min(1, rate);
+/**
+ * The share of the way to a target to move this frame, for smoothing that covers `1 / tau` of the gap per second. Tuned at 60 fps, where it is exactly
+ * `dt / tau` (the old per-frame rate), and the same pace at any other frame rate: a plain `dt / tau` ramps up faster on a 30 fps phone than on a 120 Hz screen.
+ */
+const blend = (tau: number, dt: number) => 1 - Math.pow(1 - Math.min(0.95, 1 / (60 * tau)), dt * 60);
 /** Yaw that turns Hue's local +X (his forward) toward a world XZ direction. */
 const yawFor = (x: number, z: number) => Math.atan2(-z, x);
 
@@ -113,6 +118,8 @@ class HueMover {
   private lastGroundedAt = 0;
   private jumpPressedAt = -Infinity;
   private prevJump = false;
+  /** False from the moment he is placed (the begin press, a restart) until the jump key has been let go once: the key that began the run is often Space or the pad's A, and must not also be his first jump. */
+  private jumpArmed = false;
   private jumped = false; // this air time started with a jump or bounce
   private shortHopCut = false;
   private doubleUsed = false;
@@ -128,6 +135,8 @@ class HueMover {
   private ladderLeftBottom = false;
   /** Just stepped off the ladder: don't re-grab it until the stick/keys are let go. */
   private ladderNeedsRelease = false;
+  /** The camera's turn when he took hold of a ladder or a ledge: the keys keep that meaning until he lets go, however the camera swings (a held key must not flip from "toward the ladder" to "away"). */
+  private controlYaw: number | null = null;
   /** Whether autostep currently ignores dynamic bodies (true while running). */
   private autostepDynamic = false;
   /** The ladder Hue is on (or last used); `ladders` is every ladder in the level. */
@@ -151,6 +160,11 @@ class HueMover {
     this.ray = new rapier.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: -1, z: 0 });
   }
 
+  /** The game is paused (or between runs): a jump key still held when it comes back has to be let go first, so the Space that resumes is not also a jump. */
+  disarmJump() {
+    this.jumpArmed = false;
+  }
+
   /** Places the capsule at `feet` (used when control starts and on reset). */
   place(feet: THREE.Vector3, yaw: number) {
     this.feet.copy(feet);
@@ -160,6 +174,7 @@ class HueMover {
     this.grounded = true;
     this.landing = this.climb = this.ladderMove = null;
     this.jumpPressedAt = -Infinity;
+    this.jumpArmed = false;
     // Air-time state too: a restart mid-jump used to leave `jumped` set, which blocks jumping.
     this.jumped = false;
     this.shortHopCut = false;
@@ -257,7 +272,8 @@ class HueMover {
     this.debugProbe.active = false;
 
     // Camera-relative input on the ground plane (yaw only, so looking down still walks forward).
-    const cy = runtime.debug.input ? 0 : runtime.moveYaw;
+    if (this.mode !== "ladder" && this.mode !== "climb") this.controlYaw = null;
+    const cy = runtime.debug.input ? 0 : (this.controlYaw ?? runtime.moveYaw);
     let dirX = -Math.sin(cy) * input.moveZ + Math.cos(cy) * input.moveX;
     let dirZ = -Math.cos(cy) * input.moveZ - Math.sin(cy) * input.moveX;
     const mag = Math.min(1, Math.hypot(dirX, dirZ));
@@ -268,8 +284,10 @@ class HueMover {
     }
     runtime.steering = mag > 0.1;
     if (mag < 0.1) this.ladderNeedsRelease = false;
-    const jumpPressed = input.jump && !this.prevJump;
-    this.prevJump = input.jump;
+    if (!input.jump) this.jumpArmed = true;
+    const jump = input.jump && this.jumpArmed;
+    const jumpPressed = jump && !this.prevJump;
+    this.prevJump = jump;
     if (jumpPressed) this.jumpPressedAt = this.now;
 
     if (this.mode === "climb") return this.updateClimb(dt, dirX, dirZ, mag);
@@ -288,21 +306,21 @@ class HueMover {
       this.anim.play("jump", { from: CLIP_TIMES.jumpTakeoff, timeScale: CLIP_TIMES.jumpClipScale, holdAt: CLIP_TIMES.jumpAirHold, restart: true, fade: 0.08 });
     }
     // Short hop: releasing Space early cuts the upward speed.
-    if (this.jumped && !this.shortHopCut && !input.jump && this.vel.y > 0) {
+    if (this.jumped && !this.shortHopCut && !jump && this.vel.y > 0) {
       this.vel.y *= 1 - MOVE.shortHopCut;
       this.shortHopCut = true;
     }
 
     // Horizontal velocity.
     if (this.mode === "air") {
-      const rate = (dt / MOVE.accelTime) * 3 * MOVE.airControl;
+      const rate = blend(MOVE.accelTime / (3 * MOVE.airControl), dt);
       if (inputMag > 0) {
         this.vel.x = approach(this.vel.x, dirX * MOVE.airSpeed * inputMag, rate);
         this.vel.z = approach(this.vel.z, dirZ * MOVE.airSpeed * inputMag, rate);
       }
     } else {
       const speed = input.run ? MOVE.runSpeed : MOVE.walkSpeed;
-      const rate = dt / (MOVE.accelTime / 3); // ~95% of the way in accelTime
+      const rate = blend(MOVE.accelTime / 3, dt); // ~95% of the way in accelTime
       this.vel.x = approach(this.vel.x, dirX * speed * inputMag, rate);
       this.vel.z = approach(this.vel.z, dirZ * speed * inputMag, rate);
     }
@@ -310,7 +328,7 @@ class HueMover {
     // Turn toward the input direction.
     if (inputMag > 0.05) {
       const target = yawFor(dirX, dirZ);
-      this.yaw = wrapAngle(this.yaw + wrapAngle(target - this.yaw) * Math.min(1, MOVE.turnRate * dt));
+      this.yaw = wrapAngle(this.yaw + wrapAngle(target - this.yaw) * blend(1 / MOVE.turnRate, dt));
     }
 
     // Ledge climb / ladder: grounded, pushing forward.
@@ -331,10 +349,13 @@ class HueMover {
     // Gravity.
     // Jump arcs (take-off or bounce) use the slower jump gravity; plain falls use normal gravity.
     const g = this.mode === "air" && this.jumped ? MOVE.jumpGravity : MOVE.gravity;
+    const vyStart = this.vel.y;
     this.vel.y = Math.max(this.vel.y - g * dt, -MOVE.maxFallSpeed);
     const vyBefore = this.vel.y;
 
-    const desired = { x: this.vel.x * dt, y: this.vel.y * dt, z: this.vel.z * dt };
+    // The height gained this frame is the average of the speed at its start and its end, so the arc is the true parabola at any frame rate
+    // (stepping with the end speed alone cut a jump's apex from 0.60 m to 0.56 m at 30 fps).
+    const desired = { x: this.vel.x * dt, y: 0.5 * (vyStart + this.vel.y) * dt, z: this.vel.z * dt };
 
     // Roll root motion: follow the forward travel stripped from fall_roll.
     if (this.landing?.kind === "roll") {
@@ -359,11 +380,21 @@ class HueMover {
     if (this.grounded) {
       this.lastGroundedAt = this.now;
       if (this.vel.y < 0) this.vel.y = 0;
+      // Food on the deli case is pushed, not stood on: if he has landed on a piece, he slides off it (and drops back to the case).
+      const under = noStandBodies.size ? this.groundCollider()?.parent() : null;
+      if (under && noStandBodies.has(under)) {
+        const p = under.translation();
+        const sx = this.feet.x - p.x;
+        const sz = this.feet.z - p.z;
+        const sd = Math.hypot(sx, sz) || 1;
+        this.feet.x += (sx / sd) * 1.1 * dt;
+        this.feet.z += (sz / sd) * 1.1 * dt;
+      }
     }
     if (!this.grounded && this.vel.y > 0 && m.y < desired.y - 1e-4) this.vel.y = 0; // head bump
 
     const actualSpeed = Math.hypot(m.x, m.z) / Math.max(dt, 1e-4);
-    this.speedSmoothed = approach(this.speedSmoothed, actualSpeed, dt * 12);
+    this.speedSmoothed = approach(this.speedSmoothed, actualSpeed, blend(1 / 12, dt));
 
     this.updateMode(dt, wasGrounded, mag, input.run, vyBefore);
     this.publish();
@@ -558,6 +589,7 @@ class HueMover {
 
   private startClimb(top: number, faceDist: number, dirX: number, dirZ: number) {
     this.mode = "climb";
+    this.controlYaw = runtime.moveYaw;
     // Step far enough to put the capsule centre a few cm past the lip, however far away the
     // face was when the climb started (the probe reaches 0.1 m beyond the capsule).
     const over = Math.max(CLIMB.overDistance, faceDist + CLIMB.overPastLip);
@@ -660,8 +692,9 @@ class HueMover {
     const lateral = (f.x - L.line.x) * L.facing.z - (f.z - L.line.z) * L.facing.x; // signed distance across
     const along = (f.x - L.line.x) * L.facing.x + (f.z - L.line.z) * L.facing.z; // + = toward the ladder
 
-    // Bottom: on the right-wall shelf, at the ladder, pushing toward it.
-    if (Math.abs(f.y - L.bottomY) < 0.05 && Math.abs(lateral) < 0.12 && along > -0.15 && toward > 0.5) {
+    // Bottom: on the right-wall shelf, at the ladder, pushing toward it. He has to be at its foot (`along` is 0 where he rests against it): the far
+    // side of a shelf is on the same line, and from there he must not be pulled through the shelf onto the ladder.
+    if (Math.abs(f.y - L.bottomY) < 0.05 && Math.abs(lateral) < 0.12 && along > -0.15 && along < 0.05 && toward > 0.5) {
       this.ladder = L;
       this.enterLadder();
       this.feet.set(L.line.x, L.bottomY + 0.005, L.line.z);
@@ -688,6 +721,7 @@ class HueMover {
   private enterLadder() {
     const L = this.ladder!;
     this.mode = "ladder";
+    this.controlYaw = runtime.moveYaw;
     this.ladderLeftBottom = false;
     this.vel.set(0, 0, 0);
     this.landing = null;

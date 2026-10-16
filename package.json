@@ -13,7 +13,13 @@
     "test:gamepad": "node tests/gamepad.mjs",
     "export:hue": "rm -rf out && STATIC_EXPORT=1 NEXT_PUBLIC_BASE_PATH=/huesroom NEXT_PUBLIC_SITE_URL=https://hue.onl next build",
     "export:app": "rm -rf out && STATIC_EXPORT=1 next build",
-    "test:street": "node tests/street.mjs && LEVEL=street node tests/routes.mjs tests/routes-street.json"
+    "test:grade": "node tests/grade.mjs",
+    "test:flow": "node tests/flow.mjs",
+    "test:reach": "node tests/reach.mjs",
+    "test:pages": "node tests/pages.mjs",
+    "test:menu": "node tests/menu.mjs",
+    "test:street": "node tests/street.mjs && LEVEL=street node tests/routes.mjs tests/routes-street.json",
+    "test:deli": "node tests/camera-deli.mjs && node tests/ladders-deli.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.8",

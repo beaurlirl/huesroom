@@ -528,5 +528,22 @@
    }
   ],
   "expectPeak": 1.0
+ },
+ {
+  "name": "portal steps: sidewalk -> top step (0.36)",
+  "start": [
+   -7.97,
+   0.1,
+   -1.3,
+   180
+  ],
+  "steps": [
+   {
+    "z": -1,
+    "ms": 2500
+   }
+  ],
+  "expectMin": 0.33,
+  "settle": 1200
  }
 ]

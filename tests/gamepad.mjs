@@ -32,4 +32,25 @@ check('A resumes', !(await st()).paused);
 await press(8);
 await p.waitForTimeout(300);
 check('View restarts', ['resetting', 'intro'].includes((await st()).phase), (await st()).phase);
+// The home menu with a pad: the D-pad walks the buttons and A presses the one in focus (it used to start the first location whatever was shown).
+{
+  const base = (process.env.URL || 'http://localhost:3100/?test').replace(/\/?\?.*$/, '/');
+  const q = await b.newPage({ viewport: { width: 1280, height: 800 } });
+  await q.addInitScript(() => {
+    const pad = { connected: true, mapping: 'standard', id: 'Fake Xbox', axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })) };
+    window.__pad = pad; navigator.getGamepads = () => [pad];
+  });
+  const tap = async (i) => { await q.evaluate((i) => { window.__pad.buttons[i] = { pressed: true, value: 1 }; }, i); await q.waitForTimeout(120); await q.evaluate((i) => { window.__pad.buttons[i] = { pressed: false, value: 0 }; }, i); await q.waitForTimeout(150); };
+  const label = () => q.evaluate(() => (document.activeElement?.textContent ?? '').toLowerCase());
+  await q.goto(base);
+  await q.getByRole('link', { name: 'privacy' }).waitFor({ timeout: 90000 });
+  await q.waitForFunction(() => (document.activeElement?.matches('button') && (document.activeElement.textContent ?? '').toLowerCase().includes('play')), null, { timeout: 8000 });
+  await tap(13);
+  check('D-pad down moves to the next location', (await label()).includes('go'), `"${await label()}"`);
+  await tap(12);
+  check('D-pad up moves back', (await label()).includes('play'), `"${await label()}"`);
+  await tap(13);
+  await tap(0);
+  await q.waitForURL(/level=street/, { timeout: 15000 }).then(() => check('A on the second location loads it', true), () => check('A on the second location loads it', false, q.url()));
+}
 await b.close();

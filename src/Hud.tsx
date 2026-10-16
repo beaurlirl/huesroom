@@ -50,6 +50,22 @@ function Plate({ label, children, align = "left" }: { label: string; children: R
   );
 }
 
+/** The reason a coin is locked, while Hue is standing near it. */
+function Hint() {
+  const hint = useGame((s) => s.hint);
+  const phase = useGame((s) => s.phase);
+  if (!hint || phase !== "playing") return null;
+  return (
+    <div
+      className="glass absolute left-1/2 max-w-[80vw] -translate-x-1/2 px-4 py-2.5 text-center text-sm"
+      style={{ top: "calc(max(14px, env(safe-area-inset-top)) + 72px)" }}
+      role="status"
+    >
+      {hint}
+    </div>
+  );
+}
+
 function Counter() {
   const collected = useGame((s) => s.collected);
   const total = useGame((s) => s.totalCoins);
@@ -64,16 +80,16 @@ function Counter() {
   );
 }
 
-function Btn({ children, onClick, label }: { children: React.ReactNode; onClick: () => void; label?: string }) {
+export function Btn({ children, onClick, label, primary }: { children: React.ReactNode; onClick: () => void; label?: string; primary?: boolean }) {
   return (
-    <button type="button" aria-label={label} onClick={onClick} className="ui-btn pointer-events-auto text-sm">
+    <button type="button" aria-label={label} onClick={onClick} data-primary={primary ? "" : undefined} className="ui-btn pointer-events-auto text-sm">
       {children}
     </button>
   );
 }
 
 /** Sound and music switches (saved), as bracketed text like the rest of the UI. */
-function AudioSwitches() {
+export function AudioSwitches() {
   const { sfxMuted, musicMuted, toggleSfx, toggleMusic } = useAudioSettings();
   return (
     <div className="flex gap-4">
@@ -90,7 +106,7 @@ const VEIL_MS = { pause: 600, won: 1200 };
  * Full-screen white frosted glass with a directory-style header row. The room fogs over as it
  * opens and clears as it closes; the text condenses in after the glass and dissolves first.
  */
-function Veil({ open, ms, right, children }: { open: boolean; ms: number; right: React.ReactNode; children: React.ReactNode }) {
+export function Veil({ open, ms, right, children }: { open: boolean; ms: number; right: React.ReactNode; children: React.ReactNode }) {
   const { mounted, leaving, level } = useFrostPresence(open, "frosted", ms);
   if (!mounted) return null;
   const text = (delay: number) => (leaving ? GLASS.out(0.4) : GLASS.in(0.8, delay));
@@ -160,6 +176,7 @@ export function WinPanel({ share }: { share?: React.ReactNode }) {
   const result = useGame((s) => s.result);
   const restart = useGame((s) => s.restart);
   const goToLevel = useGame((s) => s.goToLevel);
+  const goToMenu = useGame((s) => s.goToMenu);
   const total = useGame((s) => s.totalCoins);
   const level = useLevel();
   // The result outlives the "won" phase while the glass clears on a restart.
@@ -216,6 +233,7 @@ export function WinPanel({ share }: { share?: React.ReactNode }) {
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2" style={{ animation: GLASS.in(0.8, t * 3) }}>
             {upNext && <Btn onClick={() => goToLevel(upNext.id)}>next location</Btn>}
             <Btn onClick={restart}>play again</Btn>
+            <Btn onClick={goToMenu}>menu</Btn>
             {share}
             <span className="flex-1" />
             <AudioSwitches />
@@ -230,6 +248,7 @@ export function WinPanel({ share }: { share?: React.ReactNode }) {
 function PausePanel({ open }: { open: boolean }) {
   const setPaused = useGame((s) => s.setPaused);
   const restart = useGame((s) => s.restart);
+  const goToMenu = useGame((s) => s.goToMenu);
   const touch = useIsTouch();
   const level = useLevel();
   return (
@@ -242,6 +261,7 @@ function PausePanel({ open }: { open: boolean }) {
         <div className="flex flex-wrap gap-x-5 gap-y-2" style={{ animation: GLASS.in(0.7, 0.3) }}>
           <Btn onClick={() => setPaused(false)}>resume</Btn>
           <Btn onClick={restart}>restart</Btn>
+          <Btn onClick={goToMenu}>menu</Btn>
         </div>
         <div style={{ animation: GLASS.in(0.7, 0.4) }}>
           <AudioSwitches />
@@ -285,6 +305,7 @@ export function Hud({ share }: { share?: React.ReactNode }) {
           </Plate>
         )}
       </div>
+      <Hint />
       <PausePanel open={paused && phase === "playing"} />
       <WinPanel share={share} />
     </div>

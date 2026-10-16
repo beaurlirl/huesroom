@@ -1,8 +1,9 @@
 "use client";
 
-import { Bloom, EffectComposer, N8AO, SMAA, ToneMapping } from "@react-three/postprocessing";
+import { BrightnessContrast, Bloom, EffectComposer, HueSaturation, N8AO, SMAA, ToneMapping } from "@react-three/postprocessing";
 import { ToneMappingMode } from "postprocessing";
 import { BLOOM } from "./config";
+import { gradeValues, gradeWanted } from "./fx/grade";
 import { useIsTouch } from "./Hud";
 import { useLevel } from "./useLevel";
 
@@ -22,12 +23,16 @@ export function Effects() {
   // A street is full of thin bars and rails that crawl when the camera moves; SMAA on top of the multisampling smooths them
   // (the sub-pixel jitter test dropped the flickering edge pixels by about a fifth). ?raw leaves it out, for comparing.
   const smaa = level.lighting === "street" && !new URLSearchParams(window.location.search).has("raw");
+  const grade = gradeWanted();
+  const g = gradeValues();
   return (
     <EffectComposer multisampling={4}>
       {/* Contact shading where things meet (couch/floor, corners, Hue's feet) grounds the room. */}
       <N8AO aoRadius={0.22} distanceFalloff={0.6} intensity={2.2} quality="medium" halfRes color="#1a120a" />
       <Bloom luminanceThreshold={BLOOM.threshold} luminanceSmoothing={0.1} intensity={BLOOM.intensity} mipmapBlur />
       <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
+      {grade ? <HueSaturation saturation={g.saturation} /> : <></>}
+      {grade ? <BrightnessContrast brightness={g.brightness} contrast={g.contrast} /> : <></>}
       {smaa ? <SMAA /> : <></>}
     </EffectComposer>
   );
