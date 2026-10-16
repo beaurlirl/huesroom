@@ -115,6 +115,8 @@ export function CameraRig() {
     flip: 0,
     intro: 0,
     latch: false,
+    /** The stick angle (runtime.stickAngle) when the latch was set. */
+    latchAngle: 0,
     /** A fixed shot (levels.ts `shots`): which one is on, and how far the camera is into it (0 = the normal follow shot, 1 = the shot). */
     shot: null as NonNullable<LevelCamera["shots"]>[number] | null,
     shotW: 0,
@@ -311,7 +313,10 @@ export function CameraRig() {
         const m = sh === st.shot && st.shotW > 0.05 ? 0.12 : 0;
         return f.x >= sh.x0 - m && f.x <= sh.x1 + m && f.z >= sh.z0 - m && f.z <= sh.z1 + m && f.y <= (sh.y1 ?? Infinity) + m;
       }) ?? null;
-    if (inShot !== (st.shotW > 0.5 ? st.shot : null) && (inShot || st.shotW > 0.5)) st.latch = runtime.steering;
+    if (inShot !== (st.shotW > 0.5 ? st.shot : null) && (inShot || st.shotW > 0.5)) {
+      st.latch = runtime.steering;
+      st.latchAngle = runtime.stickAngle;
+    }
     if (!inShot && st.shot?.once) st.shotsDone.add(st.shot); // the opening is played: it never comes back
     if (inShot) st.shot = inShot;
     st.shotW = clamp(smoothDamp(st.shotW, inShot ? 1 : 0, st.vsw, cam.shotBlend ?? cam.cornerBlend, dt), 0, 1);
@@ -323,7 +328,8 @@ export function CameraRig() {
       const want = f.z > cam.flipDeadband ? -1 : f.z < -cam.flipDeadband ? 1 : st.side;
       if (want !== st.side) {
         st.side = want;
-        st.latch = runtime.steering; // a direction held through the swing keeps its meaning until let go
+        st.latch = runtime.steering; // a direction held through the swing keeps its meaning until let go (or turned well away, see CAMERA.latchRelease)
+        st.latchAngle = runtime.stickAngle;
       }
       const goal = st.side > 0 ? 0 : 1;
       st.flip += Math.max(-dt / cam.flipTime, Math.min(dt / cam.flipTime, goal - st.flip));
@@ -554,8 +560,8 @@ export function CameraRig() {
     euler.current.set(pitch + p.pitch, yaw + p.yaw, 0);
     camera.quaternion.setFromEuler(euler.current);
     runtime.cameraYaw = yaw;
-    // The controls follow the camera, except that a direction held through a flip keeps its meaning until it is let go.
-    if (st.latch && !runtime.steering) st.latch = false;
+    // The controls follow the camera, except that a direction held through a flip keeps its meaning until it is let go or turned well away from where it was.
+    if (st.latch && (!runtime.steering || Math.abs(Math.atan2(Math.sin(runtime.stickAngle - st.latchAngle), Math.cos(runtime.stickAngle - st.latchAngle))) > cam.latchRelease)) st.latch = false;
     if (!st.latch) runtime.moveYaw = yaw;
 
     const dist = Math.hypot(dx, dy, dz);

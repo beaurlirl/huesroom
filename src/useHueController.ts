@@ -283,6 +283,7 @@ class HueMover {
       dirZ /= l;
     }
     runtime.steering = mag > 0.1;
+    if (runtime.steering) runtime.stickAngle = Math.atan2(input.moveX, input.moveZ);
     if (mag < 0.1) this.ladderNeedsRelease = false;
     if (!input.jump) this.jumpArmed = true;
     const jump = input.jump && this.jumpArmed;

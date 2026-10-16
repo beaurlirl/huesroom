@@ -67,6 +67,40 @@ for (const level of levels) {
   await browser.close();
 }
 
+// The joystick across the street's camera flip: a direction held through the flip carries straight on, but a thumb that stays on the stick and steers afterwards gets the new view
+// (it used to keep the old one until the stick was let go, so "right" walked him left across the screen).
+{
+  const { browser, page, errors: errs } = await open({ level: 'street', viewport: { width: 844, height: 390 } });
+  await begin(page);
+  await takeClock(page);
+  const r = await page.evaluate(() => {
+    const H = window.__hue, R = H.runtime, D = R.debug, T = H.touch, out = {};
+    const frames = (n) => { for (let i = 0; i < n; i++) window.__vt.frame(1 / 32); };
+    const stick = (x, z) => T.setState({ moveX: x, moveZ: z, run: true });
+    const start = (x, y, z) => { stick(0, 0); D.input = null; D.teleport(x, y, z, 90); frames(100); };
+    start(-1.0, 0.1, -1.5);
+    stick(0, -1); frames(32 * 6);
+    out.crossed = { x: +R.feet.x.toFixed(2), z: +R.feet.z.toFixed(2), side: R.camSide };
+    stick(0, 0); frames(40);
+    start(-4.0, 0.1, -1.5);
+    stick(0.7, -0.7); frames(32 * 4); // across the centre line, thumb still down
+    out.flipped = R.camSide;
+    const x0 = R.feet.x;
+    stick(1, 0); frames(64);
+    out.nudge = +((R.feet.x - x0) * (R.camSide > 0 ? 1 : -1)).toFixed(2); // metres toward the RIGHT of the screen
+    stick(0, 0); frames(20);
+    const x1 = R.feet.x;
+    stick(1, 0); frames(48); stick(0, 0);
+    out.released = +((R.feet.x - x1) * (R.camSide > 0 ? 1 : -1)).toFixed(2);
+    return out;
+  });
+  check('joystick: holding one direction carries straight across the street through the camera flip', r.crossed.z > 1.2 && Math.abs(r.crossed.x + 1.0) < 0.15 && r.crossed.side === -1, JSON.stringify(r.crossed));
+  check('joystick: steering without letting go after the flip goes the way the stick points on the new view', r.flipped === -1 && r.nudge > 0.5, `moved ${r.nudge} m toward the right of the screen`);
+  check('joystick: and so does the stick after letting go', r.released > 0.5, `moved ${r.released} m toward the right of the screen`);
+  errors.push(...errs);
+  await browser.close();
+}
+
 // The deli's walls: from the pillar beside the left wall, a jump toward the wall used to land on its top (2.34 m), and a walk along it dropped him out of the level.
 if (levels.includes('deli')) {
   const { browser, page, errors: errs } = await open({ level: 'deli' });

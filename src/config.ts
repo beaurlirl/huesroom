@@ -243,6 +243,11 @@ export const CAMERA = {
   /** Two-sided streets: seconds for the camera to swing to the other side, and the dead band (m) around the centre line. */
   flipTime: 0.9,
   flipDeadband: 0.12,
+  /**
+   * A direction held through a camera flip (or a fixed shot's cut) keeps its old meaning, so a run across the street carries straight on. It lasts until the stick is let go,
+   * or turned this far from where it was when the camera moved: a thumb that never leaves the stick has to be able to steer, and "right" has to mean right on the new view.
+   */
+  latchRelease: (35 * Math.PI) / 180,
   /** While climbing a ledge the camera follows this much tighter (× smoothY / smoothLook), so the hop up never outruns it. */
   climbSmoothScale: 0.45,
   yawClamp: (55 * Math.PI) / 180,

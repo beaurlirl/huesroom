@@ -193,6 +193,8 @@ export const runtime = {
   moveYaw: 0,
   /** Hue is being steered right now (set by the controller). */
   steering: false,
+  /** Which way the stick (or the keys) is pushed, before the camera turns it into a heading: 0 = away from the camera, +90° = right on screen. */
+  stickAngle: 0,
   /** Two-sided streets: which side the camera is on (+1 / -1) and how far through the swing between them (0..1, eased). */
   camSide: 1 as 1 | -1,
   camFlip: 0,
