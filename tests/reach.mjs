@@ -62,7 +62,7 @@ for (const level of levels) {
     return out;
   });
   const vals = Object.values(apex);
-  check('a full jump is the same height at 30, 60, 120 and 240 fps', Math.max(...vals) - Math.min(...vals) < 0.02 && Math.min(...vals) > 0.59, JSON.stringify(apex));
+  check('a full jump is the same height at 32, 64, 128 and 256 fps', Math.max(...vals) - Math.min(...vals) < 0.02 && Math.min(...vals) > 0.59, JSON.stringify(apex));
   errors.push(...errs);
   await browser.close();
 }
