@@ -116,6 +116,47 @@ await page.waitForFunction(() => ['resetting', 'intro', 'ready'].includes(window
   await jctx.close();
 }
 
+// 6. Every coin that sits on something (not floating high above it, for a jump or a bounce) has room for Hue to stand within pick-up distance: the street's north-ledge
+// coin was 6 cm too far under a fire-escape deck, nobody could pick it up, and the level could not be won. (npm run test:reach proves the whole route; this names the coin.)
+for (const level of ['home', 'street', 'deli']) {
+  const cctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const cp = await cctx.newPage();
+  cp.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
+  await cp.goto(URL.replace('?test', `?test&level=${level}`));
+  await cp.waitForFunction(() => window.__hue?.useGame.getState().phase === 'ready', null, { timeout: 90000 });
+  const stuck = await cp.evaluate(() => {
+    const H = window.__hue, R = 0.06, HEIGHT = 0.455, PICK = 0.14;
+    const cols = H.colliders.filter((c) => !c.userData.ladder && !c.userData.retired && !c.userData.door);
+    const inside = (c, x, y, z) => Math.abs(x - c.center.x) <= c.halfExtents.x + 1e-6 && Math.abs(y - c.center.y) <= c.halfExtents.y + 1e-6 && Math.abs(z - c.center.z) <= c.halfExtents.z + 1e-6;
+    // is the column of the capsule (radius R, feet at y) around (x, z) free of colliders, ignoring the one he stands on?
+    const clear = (x, z, y) => {
+      for (const c of cols) {
+        const top = c.center.y + c.halfExtents.y, bot = c.center.y - c.halfExtents.y;
+        if (top <= y + 0.03 || bot >= y + HEIGHT) continue; // below his feet, or above his head
+        if (Math.abs(x - c.center.x) < c.halfExtents.x + R && Math.abs(z - c.center.z) < c.halfExtents.z + R) return false;
+      }
+      return true;
+    };
+    const out = [];
+    H.scene.updateMatrixWorld(true);
+    H.scene.traverse((o) => {
+      const nm = o.userData?.name ?? o.name;
+      if (!/^COIN_\d+$/.test(nm)) return;
+      const p = o.getWorldPosition(new o.position.constructor());
+      // what he could stand on and still pick it up: a collider top within reach of the coin (his capsule spans feet + 0.06 to feet + 0.40, so the top is 0.06 to 0.40 below it)
+      const floors = new Set();
+      for (const c of cols) { const top = c.center.y + c.halfExtents.y; if (top <= p.y - 0.06 + 1e-6 && top >= p.y - 0.40 && Math.abs(p.x - c.center.x) < c.halfExtents.x + PICK && Math.abs(p.z - c.center.z) < c.halfExtents.z + PICK) floors.add(+top.toFixed(3)); }
+      if (!floors.size) return; // floating: reached by a jump, not a stand
+      let ok = false;
+      for (const floor of floors) for (let a = 0; a < 16 && !ok; a++) for (const r of [0, 0.05, 0.1, 0.13]) { const x = p.x + Math.cos((a * Math.PI) / 8) * r, z = p.z + Math.sin((a * Math.PI) / 8) * r; if (clear(x, z, floor)) { ok = true; break; } }
+      if (!ok) out.push(`${nm} at ${[p.x, p.y, p.z].map((v) => v.toFixed(2))}`);
+    });
+    return out;
+  });
+  check(`${level}: every coin that sits on something has room for Hue to stand within pick-up distance`, stuck.length === 0, stuck.join('; '));
+  await cctx.close();
+}
+
 console.log(errors.length ? '\nbrowser errors:\n' + [...new Set(errors)].join('\n') : '\nno browser errors');
 console.log(`\n${results.filter(Boolean).length}/${results.length} checks passed`);
 await browser.close();

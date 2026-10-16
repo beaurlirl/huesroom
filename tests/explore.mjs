@@ -20,11 +20,24 @@ await page.evaluate(installSim, { DT, ACTIONS });
 await page.evaluate(({ CELL, MAX }) => {
   const H = window.__hue, R = H.runtime, G = H.useGame, X = window.__simx;
   G.setState({ totalCoins: 9999 }); // never win while exploring
+  // A coin that waits for another (the deli: pay before you grab your food), and the doors that open on one, are searched open: collect the one they wait for, for real, first.
+  const home = { x: R.feet.x, y: R.feet.y, z: R.feet.z };
+  for (const need of new Set(X.coins.map((c) => c.req).filter(Boolean))) {
+    const r = X.coins.find((c) => c.name === need);
+    for (const dy of [0.25, 0.15, 0.35, 0.05]) {
+      if (G.getState().collectedNames.includes(need)) break;
+      R.debug.input = { x: 0, z: 0, run: false, jump: false };
+      R.debug.teleport(r.x, r.y - dy, r.z, 90);
+      for (let i = 0; i < 12; i++) window.__vt.frame(1 / 30);
+    }
+  }
+  R.debug.teleport(home.x, home.y, home.z, 90);
+  for (let i = 0; i < 12; i++) window.__vt.frame(1 / 30);
   const key = (x, y, z) => `${Math.round(x / CELL)},${Math.round(y / 0.15)},${Math.round(z / CELL)}`;
   const S = { visited: new Map(), queue: [], edges: [], leaks: [], coinFirst: {}, expanded: 0, frames: 0, stuck: [], seeds: [], coins: X.coins };
   window.__ex = S;
-  S.start = key(R.feet.x, R.feet.y, R.feet.z);
-  S.visited.set(S.start, { x: R.feet.x, y: R.feet.y, z: R.feet.z, from: null, act: null });
+  S.start = key(home.x, home.y, home.z);
+  S.visited.set(S.start, { x: home.x, y: home.y, z: home.z, from: null, act: null });
   S.queue.push(S.start);
   // The foot of every ladder is a start of its own: the climb is checked from it, and the route replay says whether the walk-up from the street reaches it.
   for (const c of H.colliders) {
