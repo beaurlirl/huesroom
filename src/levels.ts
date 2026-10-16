@@ -124,7 +124,6 @@ export const LEVELS: readonly LevelDef[] = [
     start: "stand",
     winLine: "hue got what he came for",
     lighting: "shop",
-    xray: true,
     camera: {
       // The deli is 7.7 m long and 4.7 m deep (a real deli at 0.65, so Hue is about 2 and a third feet tall in it). The camera follows him
       // loosely along the shop and rises with his depth, to look over the shelves. A narrower lens than the room's keeps Hue big on screen.
