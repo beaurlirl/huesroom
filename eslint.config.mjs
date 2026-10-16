@@ -20,6 +20,8 @@ const eslintConfig = defineConfig([
     "scripts/**",
     "tests/**",
     "public/**",
+    // The iOS wrapper's copy of the exported site (built files, not ours).
+    "ios/**",
   ]),
 ]);
 
