@@ -22,6 +22,12 @@ export type LevelCamera = Partial<typeof CAMERA> & {
   shotBlend?: number;
   /** The camera never leaves this box (the shop's walls: x and z limits), except in the opening, which stands outside the door. */
   confine?: { x0: number; x1: number; z0: number; z1: number };
+  /**
+   * Sight map: the camera checks it can see all of Hue against what is solid in the room (rasterised from the model once it has loaded; needs `confine`). Where the shots and zones
+   * below put it somewhere it cannot, it moves to the nearest spot that can: closer to him, then higher, then round to the side. `release`: seconds the shot's own camera must see
+   * him again before the camera goes back to it; `cell`: the map's cell size (m); `lookLag`: the most (m) the point the camera looks at may trail his chest.
+   */
+  sight?: { cell?: number; release?: number; lookLag?: number };
   /** Keep Hue in view: if a tall fixture (a collider with `view_block` in its data) would hide him from where the camera is, the camera rises or slides until it can see him. */
   keepInView?: boolean;
   /** A last smoothing over the camera's position (seconds), so cutting from one shot to another never pops. Off when missing. */
@@ -130,6 +136,7 @@ export const LEVELS: readonly LevelDef[] = [
       fov: 40,
       fovFar: 34,
       confine: { x0: -3.78, x1: 3.78, z0: -2.7, z1: 2.45 },
+      sight: {},
       keepInView: true,
       shotBlend: 1.1,
       finalSmooth: 0.3,

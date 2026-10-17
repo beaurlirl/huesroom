@@ -4,13 +4,14 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { useRapier, type RapierCollider } from "@react-three/rapier";
 import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
+import { CUTAWAY, SOLID, SightGrid, findView, seesHue, viewStats } from "./camera/sight";
 import { CAMERA as BASE_CAMERA, FLAGS } from "./config";
 import type { LevelCamera } from "./levels";
 import { useIsTouch } from "./Hud";
 import { pollGamepad } from "./input/gamepad";
-import { colliderMeta, roomColliders } from "./Room";
+import { blenderName, colliderMeta, roomColliders } from "./Room";
 import { runtime, useGame } from "./store";
-import { useLevel } from "./useLevel";
+import { useLevel, useRoom } from "./useLevel";
 
 /** The base camera numbers (the peek and unblock helpers use these; the rig itself uses the level's `cam`). */
 const C = BASE_CAMERA;
@@ -78,6 +79,25 @@ function usePeek() {
   return peek;
 }
 
+/** Which meshes the camera's sight map treats as solid (camera.sight): not colliders, glass, doors, coins or loose props; a piece a shot cuts away gets its own bit. */
+function sightClass(mesh: THREE.Mesh): number {
+  if (!mesh.visible) return 0;
+  const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+  if (mats.every((m) => (m.transparent && m.opacity < 0.6) || /glaz|glass/i.test(m.name))) return 0;
+  let cut = false;
+  for (let o: THREE.Object3D | null = mesh; o; o = o.parent) {
+    const n = blenderName(o);
+    if (n.startsWith("COL_") || n.startsWith("COIN_") || n.startsWith("BOOK_KICK")) return 0;
+    if (o.userData.door || o.userData.sensor) return 0;
+    if (o.userData.cutaway) cut = true;
+  }
+  return cut ? CUTAWAY : SOLID;
+}
+
+const _want = new THREE.Vector3();
+const _sol = new THREE.Vector3();
+const _prev = new THREE.Vector3();
+
 /**
  * The camera lives on the open-wall plane (z locked). It slides on X and Y and rotates
  * to keep Hue in view. See prompt section 1.6.
@@ -89,7 +109,23 @@ export function CameraRig() {
   const coarse = useIsTouch();
   const level = useLevel();
   const cam = useMemo(() => ({ ...BASE_CAMERA, ...level.camera }) as typeof BASE_CAMERA & LevelCamera, [level]);
+  // The sight map (levels.ts `camera.sight`): what is solid in the room, so the camera can check it sees Hue. Built in slices after the level has loaded.
+  const { scene } = useRoom();
+  const grid = useMemo(() => {
+    const c = cam.confine;
+    if (!cam.sight || !c) return null;
+    // The shop and a margin, and the stretch outside the front door where the opening shot stands.
+    const g = new SightGrid(c.x0 - 3.3, -0.1, c.z0 - 0.5, cam.sight.cell ?? 0.05, c.x1 - c.x0 + 3.6, cam.yMax + 0.2, c.z1 - c.z0 + 0.9);
+    g.add(scene, sightClass);
+    return g;
+  }, [scene, cam]);
   const s = useRef({
+    /** Sight map: the offset that gets the camera a view of Hue (null = the shot's own camera sees him), the offset now in force (eased), and the time the shot's own camera has seen him since. */
+    sightAim: null as THREE.Vector3 | null,
+    sightOff: new THREE.Vector3(),
+    vso: [{ v: 0 }, { v: 0 }, { v: 0 }],
+    sightClear: 0,
+    sightTick: 0,
     unblock: new THREE.Vector2(),
     cornerW: 0,
     vcw: { v: 0 },
@@ -157,6 +193,11 @@ export function CameraRig() {
     /** The shot's lens right now (its `fov`, easing to `fov2` as Hue walks away from the start). */
     shotFov: 0,
   });
+
+  // For scripted tests (?test): the sight map, its helpers and the rig's state, so a test can ask what the camera knows.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).has("test")) Object.assign(window, { __sight: { grid, seesHue, findView, viewStats, SOLID, CUTAWAY, rig: s.current } });
+  }, [grid, s]);
 
   const targets = (st: typeof s.current) => {
     const feet = runtime.feet;
@@ -254,6 +295,7 @@ export function CameraRig() {
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, 1 / 20);
     const st = s.current;
+    if (grid && !grid.ready) grid.step(3);
     const xmin = cam.xMin ?? -cam.xClamp;
     const xmax = cam.xMax ?? cam.xClamp;
 
@@ -351,6 +393,13 @@ export function CameraRig() {
       smoothDamp(st.look.y, t.look.y, st.vly, cam.smoothLook * rise, dt),
       smoothDamp(st.look.z, t.look.z, st.vlz, cam.smoothLook, dt),
     );
+
+    // A level with a sight map keeps him in the picture: the look point never trails his chest by more than a hand's width (a fall or a jump down would otherwise outrun it).
+    if (cam.sight) {
+      const lag = st.look.distanceTo(t.look);
+      const max = cam.sight.lookLag ?? 0.18;
+      if (lag > max) st.look.lerp(t.look, 1 - max / lag);
+    }
 
     // Blocked view: slide up / sideways until Hue's chest is visible. The camera sits on the +z plane (side +1), on the
     // -z plane (side -1), or swings between them around the street's centre line.
@@ -536,6 +585,39 @@ export function CameraRig() {
       camY = st.py;
       camZ = st.pz;
     }
+    // Sight map: if the camera the shots and zones above came up with cannot see all of Hue, move it by the nearest offset that can (closer to him first, then higher, then
+    // round to the side). The offset is found every other frame and eased in quickly and out slowly, on top of the smoothed camera, so the camera stays one continuous path.
+    if (grid?.ready && cam.sight && cam.confine) {
+      const c = cam.confine;
+      const opening = !!st.shot?.pos2 && st.shotW > 0.05 && f.distanceTo(runtime.startFeet) < (st.shot.dist ?? 2) * 0.98;
+      const mask = SOLID | (st.shot?.cutaway && st.shotW > 0.6 ? 0 : CUTAWAY);
+      if ((++st.sightTick & 1) === 0) {
+        if (seesHue(grid, camX, camY, camZ, f, mask)) {
+          st.sightClear += dt * 2;
+          if (st.sightClear > (cam.sight.release ?? 0.4)) st.sightAim = null;
+        } else {
+          st.sightClear = 0;
+          // The opening stands outside the door, so a spot there is allowed (while it lasts); otherwise it is inside the shop, and never inside a fixture.
+          const lim = { x0: opening ? c.x0 - 3 : c.x0 + 0.08, x1: c.x1 - 0.08, z0: c.z0 + 0.08, z1: c.z1, yMin: cam.yMin, yMax: st.yMaxNow };
+          const prev = st.sightAim ? _prev.set(camX + st.sightAim.x, camY + st.sightAim.y, camZ + st.sightAim.z) : null;
+          const found = findView(grid, _want.set(camX, camY, camZ), f, mask, lim, prev, _sol, (x, y, z) => !st.obstacles?.some((o) => x >= o.x0 - 0.06 && x <= o.x1 + 0.06 && z >= o.z0 - 0.06 && z <= o.z1 + 0.06 && y < o.top + 0.12));
+          if (found) (st.sightAim ??= new THREE.Vector3()).set(_sol.x - camX, _sol.y - camY, _sol.z - camZ);
+          else st.sightAim = null;
+        }
+      }
+      const rate = st.sightAim ? 0.14 : 0.5;
+      st.sightOff.set(
+        smoothDamp(st.sightOff.x, st.sightAim?.x ?? 0, st.vso[0], rate, dt),
+        smoothDamp(st.sightOff.y, st.sightAim?.y ?? 0, st.vso[1], rate, dt),
+        smoothDamp(st.sightOff.z, st.sightAim?.z ?? 0, st.vso[2], rate, dt),
+      );
+      // However fast the offset moves, the camera never ends a frame inside something solid: take back as much of it as it needs (a thin end panel in the way, say).
+      let k = 1;
+      while (k > 0 && grid.solidAt(camX + st.sightOff.x * k, camY + st.sightOff.y * k, camZ + st.sightOff.z * k, mask)) k = k > 0.3 ? k - 0.25 : 0;
+      camX += st.sightOff.x * k;
+      camY += st.sightOff.y * k;
+      camZ += st.sightOff.z * k;
+    }
     camera.position.set(camX, camY, camZ);
     runtime.cameraPos.copy(camera.position);
     runtime.cutaway = st.shot?.cutaway && st.shotW > 0.6 ? st.shot.cutaway : null;
@@ -546,7 +628,7 @@ export function CameraRig() {
     const horiz = Math.hypot(dx, dz);
     const turn = Math.atan2(-dx, -dz) - theta;
     // In a fixed shot the camera may turn all the way to face down an aisle (the follow shot stays within yawClamp of the wall plane).
-    const yawLimit = THREE.MathUtils.lerp(cam.yawClamp, Math.PI, sw);
+    const yawLimit = THREE.MathUtils.lerp(cam.yawClamp, Math.PI, cam.sight ? Math.PI : sw);
     const yaw = theta + clamp(Math.atan2(Math.sin(turn), Math.cos(turn)), -yawLimit, yawLimit);
     const pitch = clamp(Math.atan2(dy, horiz), cam.pitchMin, cam.pitchMax);
 

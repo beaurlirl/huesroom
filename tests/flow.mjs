@@ -57,6 +57,31 @@ await page.waitForFunction(() => ['resetting', 'intro', 'ready'].includes(window
   });
   const lowest = Math.min(...r.walls);
   check('deli: walls are out of reach of a jump from the highest shelf top', lowest >= r.highestStandable + 0.6 + 0.4, `lowest wall top ${lowest} m, highest shelf ${r.highestStandable} m, jump 0.6 m`);
+  // The glass dome over the deli case and the freezer door hang from empties at their hinges; the leaves' vertices are in world coordinates, so the hinge's position used to be applied twice
+  // and the dome hung 1.4 m behind the case (Hue stood on the lid with no glass around the meat and cheese). Each leaf has to sit over its own collider.
+  const doors = await dp.evaluate(() => {
+    const h = window.__hue, V = h.camera.position.constructor;
+    h.scene.updateMatrixWorld(true);
+    const out = [];
+    h.scene.traverse((node) => {
+      const id = node.userData.door;
+      if (!id || node.name.startsWith('COL_')) return;
+      const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+      node.traverse((o) => {
+        if (!o.isMesh) return;
+        o.geometry.computeBoundingBox();
+        const b = o.geometry.boundingBox;
+        for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z]) { const p = new V(x, y, z).applyMatrix4(o.matrixWorld); [p.x, p.y, p.z].forEach((v, i) => { lo[i] = Math.min(lo[i], v); hi[i] = Math.max(hi[i], v); }); }
+      });
+      const cols = h.colliders.filter((c) => c.userData.door === id);
+      const clo = [Infinity, Infinity, Infinity], chi = [-Infinity, -Infinity, -Infinity];
+      for (const c of cols) { const a = [c.center.x, c.center.y, c.center.z], e = [c.halfExtents.x, c.halfExtents.y, c.halfExtents.z]; for (let i = 0; i < 3; i++) { clo[i] = Math.min(clo[i], a[i] - e[i]); chi[i] = Math.max(chi[i], a[i] + e[i]); } }
+      const mid = (l, u, i) => (l[i] + u[i]) / 2;
+      out.push({ id, off: [0, 1, 2].map((i) => +Math.abs(mid(lo, hi, i) - mid(clo, chi, i)).toFixed(2)), leaf: [lo, hi].map((a) => a.map((v) => +v.toFixed(2)).join(',')).join(' .. '), solid: [clo, chi].map((a) => a.map((v) => +v.toFixed(2)).join(',')).join(' .. ') });
+    });
+    return out;
+  });
+  check('deli: the dome and the freezer door sit over their own colliders', doors.length >= 2 && doors.every((d) => d.off[0] < 0.7 && d.off[1] < 0.7 && d.off[2] < 0.7), doors.map((d) => `${d.id} off by ${d.off.join('/')} m (leaf ${d.leaf}; solid ${d.solid})`).join('; '));
   await dctx.close();
 }
 
