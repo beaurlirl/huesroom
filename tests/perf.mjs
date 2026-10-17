@@ -1,5 +1,7 @@
-// What a frame costs, level by level: draw calls, triangles on screen, and what is held on the GPU, at spots along each level's recorded route, as a desktop and as a phone
+// What a frame costs, level by level: draw calls, triangles on screen, and what is held on the GPU, at spots along each level's recorded route, as a phone
 // (touch device: no post-processing, smaller shadow map, lower resolution). Headless Chrome counts the work; it is not a frame rate (there is no phone GPU here).
+// (A desktop profile would only count the last post-processing pass: the renderer resets its counters on every render call, and the composer makes several per frame.
+// A desktop frame is the phone's scene plus about 20 calls of ambient shading, bloom and smoothing.)
 // This is the number to check a new model against (MODEL_BUDGET in the private folder has the limits).
 //   node tests/perf.mjs [home street deli]      (dev server on 3100)      LIMITS=1 exits 1 when a phone frame goes over the limits
 import fs from 'fs';
@@ -12,7 +14,6 @@ const LIMITS = { calls: 260, triangles: 450_000 };
 const CHROME = `${process.env.HOME}/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing`;
 const browser = await chromium.launch({ executablePath: CHROME, args: ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'] });
 const profiles = {
-  desktop: { viewport: { width: 1280, height: 720 } },
   phone: { viewport: { width: 844, height: 390 }, isMobile: true, hasTouch: true, deviceScaleFactor: 3 },
 };
 const rows = [];
@@ -48,7 +49,7 @@ for (const level of levels) {
   }
 }
 await browser.close();
-console.log('level   profile  ready ms  draw calls (median/worst)  triangles on screen (median/worst)  geometries  textures  programs  JS heap MB');
+console.log('level   profile  load ms  draw calls (median/worst)  triangles on screen (median/worst)  geometries  textures  programs  JS heap MB');
 for (const r of rows) console.log(r.level.padEnd(7), r.profile.padEnd(8), String(r.readyMs).padEnd(9), `${r.callsMed}/${r.callsMax}`.padEnd(26), `${r.trisMed}/${r.trisMax}`.padEnd(35), String(r.geometries).padEnd(11), String(r.textures).padEnd(9), String(r.programs).padEnd(9), r.heapMB ?? '-', r.errors.length ? ' ERRORS ' + r.errors.join(' | ') : '');
 const over = rows.filter((r) => r.profile === 'phone' && (r.callsMax > LIMITS.calls || r.trisMax > LIMITS.triangles));
 for (const r of over) console.log(`OVER  ${r.level} on a phone: ${r.callsMax} draw calls (limit ${LIMITS.calls}), ${r.trisMax} triangles (limit ${LIMITS.triangles})`);
