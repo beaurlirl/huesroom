@@ -7,6 +7,13 @@ As of 2026-10-09.
 - **The iOS app** is a native shell around `npm run export:app`: see [APP_STORE.md](APP_STORE.md).
 - Closed unmerged on 2026-10-09: huesroom #1 (analytics and path prefix), huesroom #2 (lighter start), hue.onl #1 (rewrites proxying `/huesroom`). Their branches still exist.
 
+## Caching
+
+The big files (models, clips, music, effect pictures, the draco decoder) are sent with `Cache-Control: public, max-age=31536000, immutable` in production (`next.config.ts`), so a returning player's browser does not ask about
+them again. Their addresses carry `?v=<the commit>` (`src/config.ts` `versioned`, from `VERCEL_GIT_COMMIT_SHA`), so a new deploy still reaches everyone: every deploy re-downloads them once. Not in development
+(the stamp is the time the dev server started), and not in a static export (the app and plain static hosts: no stamp, no headers). If a big file is ever served from a new place that is not under `/levels`, `/room`,
+`/hue`, `/audio`, `/fx` or `/draco`, add the folder to `BIG_FILES` in `next.config.ts`.
+
 ## Builds
 
 ```bash

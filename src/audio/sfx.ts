@@ -4,7 +4,7 @@
 // falls back to a small Web Audio synth (also used until a clip finishes loading).
 
 import { create } from "zustand";
-import { asset } from "../config";
+import { asset, versioned } from "../config";
 
 export type SfxName = "chime" | "boing" | "thud" | "win" | "step";
 
@@ -74,7 +74,7 @@ async function loadClip(name: string, base: string) {
   const probe = document.createElement("audio");
   const ext = probe.canPlayType('audio/ogg; codecs="opus"') ? "ogg" : "mp3";
   try {
-    const res = await fetch(`${base}.${ext}`);
+    const res = await fetch(versioned(`${base}.${ext}`));
     if (!res.ok) return;
     buffers.set(name, await ctx.decodeAudioData(await res.arrayBuffer()));
   } catch {
@@ -262,7 +262,7 @@ function prepareTrack() {
   if (!ctx || !musicBus) return false;
   const el = new Audio();
   const ext = el.canPlayType('audio/ogg; codecs="opus"') ? "ogg" : "mp3";
-  el.src = `${PLAYLIST[track % PLAYLIST.length]}.${ext}`;
+  el.src = versioned(`${PLAYLIST[track % PLAYLIST.length]}.${ext}`);
   el.preload = "metadata"; // just the header while the level loads; the full track streams once it plays (startTrack)
   try {
     ctx.createMediaElementSource(el).connect(musicBus);
@@ -272,7 +272,7 @@ function prepareTrack() {
   // Next track when this one ends (one element, re-pointed, so the audio graph stays put).
   el.addEventListener("ended", () => {
     track++;
-    el.src = `${PLAYLIST[track % PLAYLIST.length]}.${ext}`;
+    el.src = versioned(`${PLAYLIST[track % PLAYLIST.length]}.${ext}`);
     void el.play().catch(() => {});
   });
   el.addEventListener("error", () => {

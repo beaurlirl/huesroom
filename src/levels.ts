@@ -1,4 +1,4 @@
-import { asset } from "./config";
+import { assetV } from "./config";
 import type { CAMERA } from "./config";
 import type { Par } from "./economy";
 
@@ -90,7 +90,7 @@ export const LEVELS: readonly LevelDef[] = [
     number: 1,
     name: "home",
     mode: "run",
-    room: asset("/room/room.glb"),
+    room: assetV("/room/room.glb"),
     spawn: "SPAWN_Hue_chair",
     start: "chair",
     winLine: "hue made it outside",
@@ -103,7 +103,7 @@ export const LEVELS: readonly LevelDef[] = [
     number: 2,
     name: "ludlow st",
     mode: "run",
-    room: asset("/levels/street/room.glb"),
+    room: assetV("/levels/street/room.glb"),
     spawn: "SPAWN_Hue_start",
     start: "stand",
     winLine: "hue made it to the deli",
@@ -130,7 +130,7 @@ export const LEVELS: readonly LevelDef[] = [
     number: 3,
     name: "the deli",
     mode: "run",
-    room: asset("/levels/deli/room.glb"),
+    room: assetV("/levels/deli/room.glb"),
     spawn: "SPAWN_Hue_start",
     start: "stand",
     winLine: "hue got what he came for",

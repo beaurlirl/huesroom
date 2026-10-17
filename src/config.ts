@@ -7,11 +7,20 @@
 export const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 export const asset = (path: string) => `${BASE_PATH}${path}`;
 
+/**
+ * The big files (models, clips, music, effect pictures) carry a version in their address (the build's commit on Vercel, set in next.config.ts), so the browser can keep them for a
+ * year without asking again and a new deploy still reaches everyone. Empty in a static export (the app and plain static hosts: nothing to bust).
+ */
+export const ASSET_VERSION = process.env.NEXT_PUBLIC_ASSET_VERSION ?? "";
+export const versioned = (url: string) => (ASSET_VERSION ? `${url}?v=${ASSET_VERSION}` : url);
+/** `asset`, for a file that gets a version (not for a folder, or a base name that gets its extension later). */
+export const assetV = (path: string) => versioned(asset(path));
+
 /** The room model belongs to the level (src/levels.ts). */
 export const ASSETS = {
-  hue: asset("/hue/hue.glb"),
+  hue: assetV("/hue/hue.glb"),
   draco: asset("/draco/"),
-  anim: (name: ClipName) => asset(`/hue/anim/${name}.glb`),
+  anim: (name: ClipName) => assetV(`/hue/anim/${name}.glb`),
 };
 
 export const FX_TEXTURES = [
@@ -20,7 +29,7 @@ export const FX_TEXTURES = [
   "/fx/smoke_puff_1.png",
   "/fx/smoke_puff_2.png",
   "/fx/smoke_puff_3.png",
-].map(asset);
+].map(assetV);
 
 export const CLIP_NAMES = [
   "idle",
