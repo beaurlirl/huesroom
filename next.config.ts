@@ -18,6 +18,8 @@ const BIG_FILES = ["/levels/:path*", "/room/:path*", "/hue/:path*", "/audio/:pat
 
 const nextConfig: NextConfig = {
   basePath,
+  // Development only: a phone on the same Wi-Fi can open the dev server at the Mac's address (the default blocks every origin but localhost, and the page loads blank).
+  allowedDevOrigins: ["192.168.*.*", "10.*.*.*", "*.local"],
   env: { NEXT_PUBLIC_ASSET_VERSION: assetVersion },
   ...(staticExport ? { output: "export" as const, trailingSlash: true } : {}),
   ...(!staticExport && process.env.NODE_ENV === "production" ? { headers: async () => BIG_FILES.map((source) => ({ source, headers: LONG_CACHE })) } : {}),
