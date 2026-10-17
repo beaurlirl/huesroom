@@ -70,6 +70,11 @@ export type LevelDef = {
    * collider, so `y` must be higher than he can ever reach (the highest standable surface plus a jump, and his height).
    */
   ceiling?: { y: number; x0: number; x1: number; z0: number; z1: number };
+  /**
+   * His drawn body stands on the drawn surface under his feet: where the invisible box he walks on is a hand below a row of cartons, or above the gap between them, his body is eased up
+   * (or a little down) to what you can see, so he never sinks into a top or hovers over it. The physics, and so every route, is untouched (see src/surface.ts).
+   */
+  snapFeet?: boolean;
   /** Hue's silhouette shows through whatever stands in front of him (a soft blue outline), so he is never lost behind a shelf or a counter. */
   xray?: boolean;
   camera?: LevelCamera;
@@ -135,6 +140,7 @@ export const LEVELS: readonly LevelDef[] = [
     start: "stand",
     winLine: "hue got what he came for",
     lighting: "shop",
+    snapFeet: true,
     // The roof: the highest thing he can stand on is 1.98 m, a jump from it takes his head to 3.04 m, so 3.1 m is a hand above anything he can do.
     ceiling: { y: 3.1, x0: -3.84, x1: 3.7, z0: -2.37, z1: 2.37 },
     camera: {

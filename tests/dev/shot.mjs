@@ -2,7 +2,7 @@
 import { chromium } from 'playwright-core';
 const [level, x, y, z, out, settle = '3'] = process.argv.slice(2);
 const browser = await chromium.launch({ executablePath: `${process.env.HOME}/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing`, args: ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'] });
-const page = await (await browser.newContext({ viewport: { width: Number(process.env.W ?? 1100), height: Number(process.env.H ?? 640) } })).newPage();
+const page = await (await browser.newContext({ viewport: { width: Number(process.env.W ?? 1100), height: Number(process.env.H ?? 640) }, deviceScaleFactor: Number(process.env.DSF ?? 1) })).newPage();
 await page.goto(`http://localhost:3100/?level=${level}&test${process.env.QUALITY ? `&quality=${process.env.QUALITY}` : ""}`);
 await page.waitForFunction(() => window.__hue?.useGame.getState().phase === 'ready', null, { timeout: 90000 });
 await page.keyboard.press('Shift');

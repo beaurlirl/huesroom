@@ -214,6 +214,9 @@ export const runtime = {
     mode: "ground" as string,
     probe: null as null | { active: boolean; from: THREE.Vector3; to: THREE.Vector3; hit: boolean },
     teleport: null as null | ((x: number, y: number, z: number, yawDeg?: number) => void),
+    /** (tests) How far his drawn body is moved at a spot to stand on the drawn top there (levels.ts `snapFeet`). */
+    feetLift: null as null | ((x: number, y: number, z: number) => number),
+    surface: null as null | { lost: number; buildMs: number; ready: boolean },
     /** Scripted input in world directions (x → +X, z → +Z); overrides keys and camera yaw. */
     input: null as null | { x: number; z: number; run: boolean; jump: boolean },
   },
