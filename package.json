@@ -18,7 +18,7 @@
     "test:reach": "node tests/reach.mjs",
     "test:pages": "node tests/pages.mjs",
     "test:menu": "node tests/menu.mjs",
-    "test:street": "node tests/street.mjs && LEVEL=street node tests/routes.mjs tests/routes-street.json",
+    "test:street": "node tests/street.mjs && LEVEL=street node tests/routes.mjs tests/routes-street.json && node tests/flip-street.mjs",
     "test:deli": "node tests/camera-deli.mjs && node tests/camera-audit.mjs && node tests/ladders-deli.mjs"
   },
   "dependencies": {

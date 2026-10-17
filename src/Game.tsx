@@ -12,6 +12,7 @@ import { listedClips, loadedClips, musicPlaying } from "./audio/sfx";
 import { bookBodies, Books } from "./Books";
 import { pushableBodies } from "./pushables";
 import { CameraRig } from "./CameraRig";
+import { Ceiling } from "./Ceiling";
 import { Coins } from "./Coins";
 import { Hud, useIsTouch } from "./Hud";
 import { useTouchInput } from "./input";
@@ -199,6 +200,7 @@ export default function Game() {
               paused={paused || phase === "resetting"}
             >
               <Room />
+              <Ceiling />
               <Hue />
               <Coins />
               <Doors />

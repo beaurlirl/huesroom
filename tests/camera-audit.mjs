@@ -57,7 +57,8 @@ await page.evaluate(({ MESH, SIZE_MIN }) => {
       const inside = h.colliders.filter((c) => !c.userData.ladder && !c.userData.door && c.userData.standable !== false && !(R.cutaway && c.name === 'COL_Median shelf') && c.halfExtents.y * 2 < 2.4 && cam.x > c.center.x - c.halfExtents.x + tol && cam.x < c.center.x + c.halfExtents.x - tol && cam.z > c.center.z - c.halfExtents.z + tol && cam.z < c.center.z + c.halfExtents.z - tol && cam.y > c.center.y - c.halfExtents.y + tol && cam.y < c.center.y + c.halfExtents.y - tol).map((c) => c.name.replace('COL_', ''));
       const opening = R.feet.distanceTo(R.startFeet) < 2.4 && cam.x < (walls?.x0 ?? -99);
       const outside = !!walls && !opening && (cam.x < walls.x0 - 0.02 || cam.x > walls.x1 + 0.02 || cam.z < walls.z0 - 0.02 || cam.z > walls.z1 + 0.02);
-      return { hidden: hits[1], hits, el: +el.toFixed(0), size: +size.toFixed(3), inFrame, inside: inside.join('+'), outside, cam: cam.toArray().map((v) => +v.toFixed(2)), feet: R.feet.toArray().map((v) => +v.toFixed(2)), fov: +lens.fov.toFixed(0), dist: +cam.distanceTo(R.feet).toFixed(2) };
+      const rig = window.__sight?.rig;
+      return { open: rig?.sightOpen && rig.sightAim ? +rig.sightOff.length().toFixed(2) : 0, hidden: hits[1], hits, el: +el.toFixed(0), size: +size.toFixed(3), inFrame, inside: inside.join('+'), outside, cam: cam.toArray().map((v) => +v.toFixed(2)), feet: R.feet.toArray().map((v) => +v.toFixed(2)), fov: +lens.fov.toFixed(0), dist: +cam.distanceTo(R.feet).toFixed(2) };
     },
     settle(sec) { for (let i = 0; i < Math.round(sec / (1 / 32)); i++) window.__vt.frame(1 / 32); },
   };
@@ -105,6 +106,9 @@ if (mode === 'route' || mode === 'all') {
     if (problems.length) { bad++; lines.push(`  step ${String(p.i).padStart(2)} ${p.act.padEnd(3)} from ${p.from.join(',')}: ${problems.join('; ')}`); }
   }
   lines.forEach((l) => console.log(l));
+  { const all = per.flatMap((p) => p.during.concat(p.rest)); const on = all.filter((s) => s.open > 0.05); console.log(`  standing back in open space (camera at least 5 cm back) in ${Math.round((100 * on.length) / all.length)}% of the route's samples, by ${on.length ? (on.reduce((a, s) => a + s.open, 0) / on.length).toFixed(2) : 0} m on average, at most ${on.length ? Math.max(...on.map((s) => s.open)).toFixed(2) : 0} m`); }
+  const roofY = await page.evaluate(() => window.__hue.level().ceiling?.y ?? null);
+  if (roofY) { const all = per.flatMap((p) => p.during.concat(p.rest)); console.log(`  camera above the roof (y > ${roofY}) in ${Math.round((100 * all.filter((s) => s.cam[1] > roofY).length) / all.length)}% of the route's samples, highest ${Math.max(...all.map((s) => s.cam[1])).toFixed(2)} m`); }
   const small = per.filter((p) => p.rest.size < SIZE_MIN).map((p) => `${p.i}(${Math.round(p.rest.size * 100)}%)`);
   console.log(`  smallest on screen at rest: ${Math.round(Math.min(...per.map((p) => p.rest.size)) * 100)}% of the picture; below ${Math.round(SIZE_MIN * 100)}% at steps ${small.join(' ') || 'none'}`);
   check(`${level} route: Hue is never out of sight for more than ${BLINK}s, always in frame, camera inside the shop (${bad} of ${per.length} steps have a problem)`, bad === 0);

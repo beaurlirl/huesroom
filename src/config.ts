@@ -240,8 +240,8 @@ export const CAMERA = {
   smoothX: 0.4,
   smoothY: 0.5,
   smoothLook: 0.25,
-  /** Two-sided streets: seconds for the camera to swing to the other side, and the dead band (m) around the centre line. */
-  flipTime: 0.9,
+  /** Two-sided streets: about how many seconds the camera takes to swing to the other side (eased in and out, and smooth if he turns back), and the dead band (m) around the centre line. */
+  flipTime: 2,
   flipDeadband: 0.12,
   /**
    * A direction held through a camera flip (or a fixed shot's cut) keeps its old meaning, so a run across the street carries straight on. It lasts until the stick is let go,

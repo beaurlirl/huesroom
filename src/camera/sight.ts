@@ -193,8 +193,8 @@ const pool: Cand[] = Array.from({ length: 5 * 24 }, () => ({ x: 0, y: 0, z: 0, c
 /** Directions tried round the wanted one (radians): higher or lower, and swung to either side (in fine steps near the wanted one, so a narrow opening such as a freezer door is found, and right round to the far side of him as a last resort). */
 const LIFTS = [0, 0.22, 0.48, 0.78, -0.2];
 const SWINGS = [0, 0.1, -0.1, 0.2, -0.2, 0.32, -0.32, 0.46, -0.46, 0.62, -0.62, 0.8, -0.8, 1, -1, 1.3, -1.3, 1.65, -1.65, 2.05, -2.05, 2.5, -2.5, Math.PI];
-/** The closest the camera comes to him (m): he fills most of the picture there. */
-const MIN_ARM = 0.5;
+/** The closest the camera comes to him (m): any nearer and he fills more than half the picture. */
+const MIN_ARM = 0.7;
 /** Room left between the camera and the first thing in the way along its arm (m). */
 const ARM_MARGIN = 0.12;
 const MAX_ELEVATION = (62 * Math.PI) / 180;

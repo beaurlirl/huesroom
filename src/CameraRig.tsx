@@ -126,6 +126,8 @@ export function CameraRig() {
     vso: [{ v: 0 }, { v: 0 }, { v: 0 }],
     sightClear: 0,
     sightTick: 0,
+    /** The offset in force is the gentle stand-back in open space, not a fix for a blocked view. */
+    sightOpen: false,
     unblock: new THREE.Vector2(),
     cornerW: 0,
     vcw: { v: 0 },
@@ -149,6 +151,10 @@ export function CameraRig() {
     /** Two-sided streets: the side the camera is on, how far through the swing it is, the intro rise (0 low .. 1 risen), and whether the controls keep their old meaning. */
     side: 1 as 1 | -1,
     flip: 0,
+    /** The swing is two critically damped filters in a row (the goal, then the swing itself), so its speed and acceleration are continuous: no jolt at either end, and turning back mid-swing is smooth too. */
+    flipGoal: 0,
+    vfg: { v: 0 },
+    vfl: { v: 0 },
     intro: 0,
     latch: false,
     /** The stick angle (runtime.stickAngle) when the latch was set. */
@@ -301,7 +307,8 @@ export function CameraRig() {
 
     if (!st.initialised && runtime.hueReady) {
       st.side = cam.twoSided && runtime.feet.z > 0 ? -1 : 1;
-      st.flip = st.side > 0 ? 0 : 1;
+      st.flip = st.flipGoal = st.side > 0 ? 0 : 1;
+      st.vfg.v = st.vfl.v = 0;
       st.intro = 0;
       st.latch = false;
       st.refY = runtime.feet.y;
@@ -374,10 +381,16 @@ export function CameraRig() {
         st.latchAngle = runtime.stickAngle;
       }
       const goal = st.side > 0 ? 0 : 1;
-      st.flip += Math.max(-dt / cam.flipTime, Math.min(dt / cam.flipTime, goal - st.flip));
+      const tau = cam.flipTime / 4.2; // two stages settle in about 4.2 of these
+      st.flipGoal = smoothDamp(st.flipGoal, goal, st.vfg, tau, dt);
+      st.flip = smoothDamp(st.flip, st.flipGoal, st.vfl, tau, dt);
+      if (Math.abs(st.flip - goal) < 0.0005 && Math.abs(st.flipGoal - goal) < 0.0005) {
+        st.flip = st.flipGoal = goal;
+        st.vfg.v = st.vfl.v = 0;
+      }
     }
     runtime.camSide = st.side;
-    runtime.camFlip = st.flip * st.flip * (3 - 2 * st.flip);
+    runtime.camFlip = clamp(st.flip, 0, 1);
     // Intro rise: start low, climb to the normal height as Hue walks away from where he began (one way: it stays up).
     if (cam.introDrop) {
       const k = clamp(f.distanceTo(runtime.startFeet) / (cam.introDist ?? 1), 0, 1);
@@ -591,21 +604,40 @@ export function CameraRig() {
       const c = cam.confine;
       const opening = !!st.shot?.pos2 && st.shotW > 0.05 && f.distanceTo(runtime.startFeet) < (st.shot.dist ?? 2) * 0.98;
       const mask = SOLID | (st.shot?.cutaway && st.shotW > 0.6 ? 0 : CUTAWAY);
+      const lim = { x0: opening ? c.x0 - 3 : c.x0 + 0.08, x1: c.x1 - 0.08, z0: c.z0 + 0.08, z1: c.z1, yMin: cam.yMin, yMax: st.yMaxNow };
+      const allowed = (x: number, y: number, z: number) => !st.obstacles?.some((o) => x >= o.x0 - 0.06 && x <= o.x1 + 0.06 && z >= o.z0 - 0.06 && z <= o.z1 + 0.06 && y < o.top + 0.12);
       if ((++st.sightTick & 1) === 0) {
         if (seesHue(grid, camX, camY, camZ, f, mask)) {
           st.sightClear += dt * 2;
-          if (st.sightClear > (cam.sight.release ?? 0.4)) st.sightAim = null;
+          if (st.sightClear > (cam.sight.release ?? 0.4)) {
+            st.sightAim = null;
+            // The camera sees him and there is room: where the way back along its own line is clear (an open stretch of floor), ease it back a little so the shop's size shows.
+            const open = cam.sight.open ?? 0;
+            if (open > 0 && !opening) {
+              // Straight back from him, at the same height (never up and over a shelf), through clear air, and never over a fixture.
+              for (const k of [1 + open, 1 + open / 2]) {
+                const x = f.x + (camX - f.x) * k, z = f.z + (camZ - f.z) * k;
+                if (x < lim.x0 || x > lim.x1 || z < lim.z0 || z > lim.z1 || !allowed(x, camY, z)) continue;
+                // (Nowhere along the way either: the camera eases there, so the middle of its path counts too.)
+                if (st.obstacles?.some((o) => [0.5, 1].some((t) => { const mx = camX + (x - camX) * t, mz = camZ + (z - camZ) * t; return mx >= o.x0 - 0.12 && mx <= o.x1 + 0.12 && mz >= o.z0 - 0.12 && mz <= o.z1 + 0.12; }))) continue;
+                if (grid.firstSolid(camX, camY, camZ, x, camY, z, 0, mask) !== Infinity || !seesHue(grid, x, camY, z, f, mask)) continue;
+                (st.sightAim ??= new THREE.Vector3()).set(x - camX, 0, z - camZ);
+                st.sightOpen = true;
+                break;
+              }
+            }
+          }
         } else {
           st.sightClear = 0;
+          st.sightOpen = false;
           // The opening stands outside the door, so a spot there is allowed (while it lasts); otherwise it is inside the shop, and never inside a fixture.
-          const lim = { x0: opening ? c.x0 - 3 : c.x0 + 0.08, x1: c.x1 - 0.08, z0: c.z0 + 0.08, z1: c.z1, yMin: cam.yMin, yMax: st.yMaxNow };
           const prev = st.sightAim ? _prev.set(camX + st.sightAim.x, camY + st.sightAim.y, camZ + st.sightAim.z) : null;
-          const found = findView(grid, _want.set(camX, camY, camZ), f, mask, lim, prev, _sol, (x, y, z) => !st.obstacles?.some((o) => x >= o.x0 - 0.06 && x <= o.x1 + 0.06 && z >= o.z0 - 0.06 && z <= o.z1 + 0.06 && y < o.top + 0.12));
+          const found = findView(grid, _want.set(camX, camY, camZ), f, mask, lim, prev, _sol, allowed);
           if (found) (st.sightAim ??= new THREE.Vector3()).set(_sol.x - camX, _sol.y - camY, _sol.z - camZ);
           else st.sightAim = null;
         }
       }
-      const rate = st.sightAim ? 0.14 : 0.5;
+      const rate = st.sightAim ? (st.sightOpen ? 0.9 : 0.14) : 0.5; // quick to get a view of him, slow to stand back and slow to let go
       st.sightOff.set(
         smoothDamp(st.sightOff.x, st.sightAim?.x ?? 0, st.vso[0], rate, dt),
         smoothDamp(st.sightOff.y, st.sightAim?.y ?? 0, st.vso[1], rate, dt),

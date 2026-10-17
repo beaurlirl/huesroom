@@ -1,5 +1,6 @@
 // How smooth is the street's camera flip? Hue walks across the street's centre line in virtual time; every frame the camera's position and direction are recorded and
 // the speed, acceleration and jerk of the camera, how fast it turns, and where Hue sits in the picture are worked out. A flip that eases in and out has no jump in any of them.
+// Run as a test (npm run test:street) it fails if any of them goes over its limit; `--json` prints the numbers only.
 //   node tests/flip-street.mjs [--json]      dev server on 3100
 import { open, begin, takeClock } from './vt.mjs';
 
@@ -31,6 +32,27 @@ const runs = await page.evaluate(() => {
     D.teleport(-3, 0.1, z0, dir > 0 ? 90 : -90);
     frames(64 * 4);
     out[name] = record(64 * 5, { x: 0, z: dir, run, jump: false });
+  }
+  // Turning back in the middle of the swing: over the line (the swing starts), then straight back across it before it is done.
+  D.input = null;
+  D.teleport(-3, 0.1, -1.2, 90);
+  frames(64 * 4);
+  {
+    const rows = [];
+    const input = (z) => ({ x: 0, z, run: true, jump: false });
+    for (let i = 0; i < 64 * 6; i++) {
+      // forward until 0.45 s after he is over the line, then back until he is clear on the far side again
+      const crossed = rows.find((r) => r.hz > 0.15);
+      const sinceCrossed = crossed ? i / 64 - crossed.t : -1;
+      const z = !crossed || sinceCrossed < 0.45 ? 1 : -1;
+      D.input = input(z);
+      window.__vt.frame(DT);
+      cam.updateMatrixWorld(true);
+      const fwd = new V(0, 0, -1).applyQuaternion(cam.quaternion);
+      const p = R.feet.clone().setY(R.feet.y + 0.2).project(cam);
+      rows.push({ t: i * DT, x: cam.position.x, y: cam.position.y, z: cam.position.z, fx: fwd.x, fy: fwd.y, fz: fwd.z, flip: R.camFlip, side: R.camSide, nx: p.x, ny: p.y, hz: R.feet.z });
+    }
+    out['turning back mid-swing'] = rows;
   }
   D.input = null;
   return out;
@@ -64,6 +86,13 @@ for (const [name, rows] of Object.entries(runs)) {
     sideChanges: rows.filter((r, i) => i && r.side !== rows[i - 1].side).length,
   };
 }
+const LIMITS = { camAccel: 25, camJerk: 450, biggestStep: 11, turnRate: 215, worstHueOffset: 0.5 };
+let failed = 0;
+for (const [name, r] of Object.entries(results)) {
+  const over = Object.entries(LIMITS).filter(([k, v]) => r[k] > v).map(([k, v]) => `${k} ${r[k]} over ${v}`);
+  if (over.length) failed++;
+  if (!json) console.log(`${over.length ? 'FAIL' : 'PASS'}  street camera flip, ${name}: ${over.length ? over.join('; ') : `peak ${r.camSpeed} m/s, accel ${r.camAccel}, jerk ${r.camJerk}, biggest step ${r.biggestStep} cm, turns at most ${r.turnRate} deg/s, Hue never beyond ${r.worstHueOffset} of the way to the edge`}`);
+}
 if (json) console.log(JSON.stringify(results));
 else {
   console.log('camera through the street flip (per run: the flip and 8 frames either side)');
@@ -72,3 +101,4 @@ else {
 }
 if (errors.length) console.log('browser errors:', [...new Set(errors)].slice(0, 3).join(' | '));
 await browser.close();
+process.exit(failed || errors.length ? 1 : 0);
