@@ -74,6 +74,7 @@ npm run test:street    # level 2: the level checks and its 27 route legs
 npm run test:deli      # level 3: the camera (never inside a fixture; round the middle shelf; and tests/camera-audit.mjs: Hue in sight
                        # on every frame of the recorded route and at every spot he can reach) and the ladders
 npm run test:flow      # the win screen's keys, falling out of the world, the deli's wall height
+node tests/perf.mjs    # what a phone frame costs per level: draw calls, triangles on screen, GPU memory (the numbers to check a new model against)
 npm run test:reach     # virtual time: every level's recorded route collects every coin and wins;
                        # a jump is the same height at 32, 64, 128 and 256 fps
 URL="http://localhost:3200/huesroom/?test" npm run test:qa   # against a sub-path build
@@ -94,6 +95,7 @@ level for what Hue can reach (and any hole in the level) with the real physics, 
 | `src/clips.ts` | animation clean-up (Hips axes, seat/rise alignment, climb clip turned around) |
 | `src/useHueController.ts` | character controller: walk/run, jump, climb, ladder, bounce, landings, book kicks |
 | `src/CameraRig.tsx` | open-wall-plane camera (z locked), blocked-view slide, peek |
+| `src/quality.ts` | desktop effect tiers (2 everything, 1 no ambient shading, 0 just the tone mapping and colour grade); the frame-rate monitor in `Game.tsx` steps them down before it lowers the resolution; `?quality=0|1|2` forces one |
 | `src/camera/sight.ts` | the camera's sight map (levels.ts `camera.sight`; the deli): the room's solid meshes in a grid, so the camera can tell it sees Hue and, if not, find the nearest spot that does. `tests/dev/` has the scratch tools used to tune it |
 | `src/Room.tsx` | room, colliders from `COL_*` (retired ones skipped), beanbag hull, squash |
 | `src/Coins.tsx`, `src/fx/` | coins, glints, smoke, coin reflection map, instanced sprites |

@@ -5,6 +5,7 @@ import { ToneMappingMode } from "postprocessing";
 import { BLOOM } from "./config";
 import { gradeValues, gradeWanted } from "./fx/grade";
 import { useIsTouch } from "./Hud";
+import { useQuality } from "./quality";
 import { useLevel } from "./useLevel";
 
 /**
@@ -19,6 +20,7 @@ import { useLevel } from "./useLevel";
 export function Effects() {
   const touch = useIsTouch();
   const level = useLevel();
+  const quality = useQuality((q) => q.level);
   if (touch) return null;
   // A street is full of thin bars and rails that crawl when the camera moves; SMAA on top of the multisampling smooths them
   // (the sub-pixel jitter test dropped the flickering edge pixels by about a fifth). ?raw leaves it out, for comparing.
@@ -26,14 +28,14 @@ export function Effects() {
   const grade = gradeWanted();
   const g = gradeValues();
   return (
-    <EffectComposer multisampling={4}>
+    <EffectComposer multisampling={quality >= 2 ? 4 : quality === 1 ? 2 : 0}>
       {/* Contact shading where things meet (couch/floor, corners, Hue's feet) grounds the room. */}
-      <N8AO aoRadius={0.22} distanceFalloff={0.6} intensity={2.2} quality="medium" halfRes color="#1a120a" />
-      <Bloom luminanceThreshold={BLOOM.threshold} luminanceSmoothing={0.1} intensity={BLOOM.intensity} mipmapBlur />
+      {quality >= 2 ? <N8AO aoRadius={0.22} distanceFalloff={0.6} intensity={2.2} quality="medium" halfRes color="#1a120a" /> : <></>}
+      {quality >= 1 ? <Bloom luminanceThreshold={BLOOM.threshold} luminanceSmoothing={0.1} intensity={BLOOM.intensity} mipmapBlur /> : <></>}
       <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
       {grade ? <HueSaturation saturation={g.saturation} /> : <></>}
       {grade ? <BrightnessContrast brightness={g.brightness} contrast={g.contrast} /> : <></>}
-      {smaa ? <SMAA /> : <></>}
+      {smaa && quality >= 1 ? <SMAA /> : <></>}
     </EffectComposer>
   );
 }

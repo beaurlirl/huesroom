@@ -141,6 +141,31 @@ await page.waitForFunction(() => ['resetting', 'intro', 'ready'].includes(window
   await jctx.close();
 }
 
+// 7. Quality tiers (desktop effects): each tier loads and runs without errors, `?quality=` is not moved by the frame-rate monitor, and unforced the tiers step down one at a time and
+// back up (before the resolution is touched).
+{
+  for (const q of [0, 1, 2]) {
+    const qctx = await browser.newContext({ viewport: { width: 1000, height: 640 } });
+    const qp = await qctx.newPage();
+    const qerr = [];
+    qp.on('pageerror', (e) => qerr.push(e.message));
+    qp.on('console', (m) => { if (m.type() === 'error') qerr.push(m.text().slice(0, 120)); });
+    await qp.goto(URL.replace('?test', `?test&quality=${q}`));
+    await qp.waitForFunction(() => window.__hue?.useGame.getState().phase === 'ready', null, { timeout: 90000 });
+    await qp.waitForTimeout(800);
+    const r = await qp.evaluate(() => { const Q = window.__hue.quality; const before = Q.getState().level; const moved = Q.getState().down() || Q.getState().up(); return { before, moved, after: Q.getState().level, canvas: !!document.querySelector('canvas') }; });
+    check(`quality ${q}: loads and draws without errors, and the monitor cannot move a forced tier`, r.before === q && !r.moved && r.after === q && r.canvas && qerr.length === 0, `${JSON.stringify(r)} ${qerr.slice(0, 2).join(' | ')}`);
+    await qctx.close();
+  }
+  const uctx = await browser.newContext({ viewport: { width: 1000, height: 640 } });
+  const up = await uctx.newPage();
+  await up.goto(URL);
+  await up.waitForFunction(() => window.__hue?.useGame.getState().phase === 'ready', null, { timeout: 90000 });
+  const steps = await up.evaluate(() => { const Q = window.__hue.quality.getState(); const out = [Q.level]; out.push(Q.down(), window.__hue.quality.getState().level, Q.down(), window.__hue.quality.getState().level, Q.down(), window.__hue.quality.getState().level); out.push(Q.up(), window.__hue.quality.getState().level, Q.up(), window.__hue.quality.getState().level, Q.up(), window.__hue.quality.getState().level); return out; });
+  check('quality steps down 2 > 1 > 0, then says so (the resolution goes next), and back up 0 > 1 > 2', JSON.stringify(steps) === JSON.stringify([2, true, 1, true, 0, false, 0, true, 1, true, 2, false, 2]), JSON.stringify(steps));
+  await uctx.close();
+}
+
 // 6. Every coin that sits on something (not floating high above it, for a jump or a bounce) has room for Hue to stand within pick-up distance: the street's north-ledge
 // coin was 6 cm too far under a fire-escape deck, nobody could pick it up, and the level could not be won. (npm run test:reach proves the whole route; this names the coin.)
 for (const level of ['home', 'street', 'deli']) {
