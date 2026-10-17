@@ -4,6 +4,7 @@ import { useFrame } from "@react-three/fiber";
 import { ConvexHullCollider, CuboidCollider, RigidBody } from "@react-three/rapier";
 import { useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
+import { paintMaterials } from "./paint";
 import { DYNAMIC_PROP_PREFIXES } from "./pushables";
 import { runtime } from "./store";
 import { hazeMaterial } from "./fx/haze";
@@ -124,6 +125,11 @@ export function Room() {
     else console.warn("room model: COL_Boundary south missing; using default open-wall z");
     return { colliders: list, hull: beanbagHull(scene) };
   }, [scene]);
+
+  // levels.ts `paint`: colour for materials the model left plain.
+  useLayoutEffect(() => {
+    if (level.paint) paintMaterials(scene, level.paint);
+  }, [scene, level]);
 
   useLayoutEffect(() => {
     scene.traverse((obj) => {

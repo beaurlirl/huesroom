@@ -1,4 +1,5 @@
 import { assetV } from "./config";
+import type { Paint } from "./paint";
 import type { CAMERA } from "./config";
 import type { Par } from "./economy";
 
@@ -70,6 +71,8 @@ export type LevelDef = {
    * collider, so `y` must be higher than he can ever reach (the highest standable surface plus a jump, and his height).
    */
   ceiling?: { y: number; x0: number; x1: number; z0: number; z1: number };
+  /** Colour for materials the model left plain: material name -> colour, roughness, metalness or glow (src/paint.ts). Costs no triangles or textures. */
+  paint?: Record<string, Paint>;
   /**
    * His drawn body stands on the drawn surface under his feet: where the invisible box he walks on is a hand below a row of cartons, or above the gap between them, his body is eased up
    * (or a little down) to what you can see, so he never sinks into a top or hovers over it. The physics, and so every route, is untouched (see src/surface.ts).
@@ -141,6 +144,16 @@ export const LEVELS: readonly LevelDef[] = [
     winLine: "hue got what he came for",
     lighting: "shop",
     snapFeet: true,
+    // The palette from the owner's entrance photo: the plaster, tile, counter fronts and countertop came out of the model white.
+    paint: {
+      "01 / Plaster • warm gray": { color: "#f1e6c7" },
+      "02 / Tile • light gray": { color: "#e8dcbc" },
+      "03 / Grout": { color: "#a39a88" },
+      "07 / Service-counter zone": { color: "#35604f", roughness: 0.38 },
+      "08 / Countertop": { color: "#e6e0d2" },
+      "11 / Shelf decks": { color: "#7d9184" },
+      "19 / Stock volume proxies": { color: "#c8aa80", roughness: 0.8 },
+    },
     // The roof: the highest thing he can stand on is 1.98 m, a jump from it takes his head to 3.04 m, so 3.1 m is a hand above anything he can do.
     ceiling: { y: 3.1, x0: -3.84, x1: 3.7, z0: -2.37, z1: 2.37 },
     camera: {

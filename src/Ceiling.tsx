@@ -7,7 +7,7 @@ import { useLevel } from "./useLevel";
 /**
  * A level's roof (levels.ts `ceiling`): a flat ceiling with a few light panels, drawn from below only. A camera above it looks straight in (the rooms are cut-aways), a camera inside
  * sees the shop shut in over Hue. It has no collider: it is higher than any jump from the highest thing he can stand on, so nothing ever touches it. Unlit, so it is the same
- * flat warm white wherever the shop's lights fall.
+ * flat warm cream (the colour of the plaster) wherever the shop's lights fall.
  */
 export function Ceiling() {
   const c = useLevel().ceiling;
@@ -26,7 +26,7 @@ export function Ceiling() {
     <group position={[(c.x0 + c.x1) / 2, c.y, (c.z0 + c.z1) / 2]}>
       <mesh rotation={[Math.PI / 2, 0, 0]}>
         <planeGeometry args={[w, d]} />
-        <meshBasicMaterial color="#e8e6e0" side={THREE.FrontSide} />
+        <meshBasicMaterial color="#eee6d3" side={THREE.FrontSide} />
       </mesh>
       {panels.map(([x, z], i) => (
         <mesh key={i} position={[x - (c.x0 + c.x1) / 2, -0.012, z - (c.z0 + c.z1) / 2]} rotation={[Math.PI / 2, 0, 0]}>
