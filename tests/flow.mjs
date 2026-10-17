@@ -170,7 +170,7 @@ await page.waitForFunction(() => ['resetting', 'intro', 'ready'].includes(window
 {
   const ectx = await browser.newContext({ viewport: { width: 900, height: 560 } });
   const ep = await ectx.newPage();
-  await ep.route('**/*.glb', (r) => r.abort());
+  await ep.route(/\.glb(\?|$)/, (r) => r.abort()); // (the models' addresses carry ?v=<deploy>)
   await ep.goto(URL.replace('?test', '?level=home'));
   const shown = await ep.getByText('the game could not load', { exact: false }).first().waitFor({ timeout: 20000 }).then(() => true, () => false);
   const btn = shown && (await ep.locator('button.ui-cta', { hasText: /reload/i }).count()) === 1;

@@ -4,7 +4,7 @@ const browser = await chromium.launch({ executablePath: `${process.env.HOME}/Lib
 const page = await (await browser.newContext({ viewport: { width: 900, height: 560 } })).newPage();
 const errs = [];
 page.on('pageerror', (e) => errs.push('pageerror: ' + e.message.slice(0, 120)));
-await page.route('**/*.glb', (r) => r.abort());
+await page.route(/\.glb(\?|$)/, (r) => r.abort());
 await page.goto('http://localhost:3100/?level=home');
 await page.waitForTimeout(Number(process.argv[2] ?? 9000));
 console.log('visible text:', JSON.stringify((await page.locator('body').innerText()).replace(/\s+/g, ' ').slice(0, 300)));
