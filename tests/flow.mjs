@@ -57,6 +57,31 @@ await page.waitForFunction(() => ['resetting', 'intro', 'ready'].includes(window
   });
   const lowest = Math.min(...r.walls);
   check('deli: walls are out of reach of a jump from the highest shelf top', lowest >= r.highestStandable + 0.6 + 0.4, `lowest wall top ${lowest} m, highest shelf ${r.highestStandable} m, jump 0.6 m`);
+  // The glass dome over the deli case and the freezer door hang from empties at their hinges; the leaves' vertices are in world coordinates, so the hinge's position used to be applied twice
+  // and the dome hung 1.4 m behind the case (Hue stood on the lid with no glass around the meat and cheese). Each leaf has to sit over its own collider.
+  const doors = await dp.evaluate(() => {
+    const h = window.__hue, V = h.camera.position.constructor;
+    h.scene.updateMatrixWorld(true);
+    const out = [];
+    h.scene.traverse((node) => {
+      const id = node.userData.door;
+      if (!id || node.name.startsWith('COL_')) return;
+      const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+      node.traverse((o) => {
+        if (!o.isMesh) return;
+        o.geometry.computeBoundingBox();
+        const b = o.geometry.boundingBox;
+        for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z]) { const p = new V(x, y, z).applyMatrix4(o.matrixWorld); [p.x, p.y, p.z].forEach((v, i) => { lo[i] = Math.min(lo[i], v); hi[i] = Math.max(hi[i], v); }); }
+      });
+      const cols = h.colliders.filter((c) => c.userData.door === id);
+      const clo = [Infinity, Infinity, Infinity], chi = [-Infinity, -Infinity, -Infinity];
+      for (const c of cols) { const a = [c.center.x, c.center.y, c.center.z], e = [c.halfExtents.x, c.halfExtents.y, c.halfExtents.z]; for (let i = 0; i < 3; i++) { clo[i] = Math.min(clo[i], a[i] - e[i]); chi[i] = Math.max(chi[i], a[i] + e[i]); } }
+      const mid = (l, u, i) => (l[i] + u[i]) / 2;
+      out.push({ id, off: [0, 1, 2].map((i) => +Math.abs(mid(lo, hi, i) - mid(clo, chi, i)).toFixed(2)), leaf: [lo, hi].map((a) => a.map((v) => +v.toFixed(2)).join(',')).join(' .. '), solid: [clo, chi].map((a) => a.map((v) => +v.toFixed(2)).join(',')).join(' .. ') });
+    });
+    return out;
+  });
+  check('deli: the dome and the freezer door sit over their own colliders', doors.length >= 2 && doors.every((d) => d.off[0] < 0.7 && d.off[1] < 0.7 && d.off[2] < 0.7), doors.map((d) => `${d.id} off by ${d.off.join('/')} m (leaf ${d.leaf}; solid ${d.solid})`).join('; '));
   await dctx.close();
 }
 
@@ -114,6 +139,44 @@ await page.waitForFunction(() => ['resetting', 'intro', 'ready'].includes(window
   await jp.keyboard.up('Space');
   check('the Space that resumes a paused game does not make him jump', resumed < 0.05 && !(await jp.evaluate(() => window.__hue.useGame.getState().paused)), `rose ${resumed.toFixed(3)} m`);
   await jctx.close();
+}
+
+// 7. Quality tiers (desktop effects): each tier loads and runs without errors, `?quality=` is not moved by the frame-rate monitor, and unforced the tiers step down one at a time and
+// back up (before the resolution is touched).
+{
+  for (const q of [0, 1, 2]) {
+    const qctx = await browser.newContext({ viewport: { width: 1000, height: 640 } });
+    const qp = await qctx.newPage();
+    const qerr = [];
+    qp.on('pageerror', (e) => qerr.push(e.message));
+    qp.on('console', (m) => { if (m.type() === 'error') qerr.push(m.text().slice(0, 120)); });
+    await qp.goto(URL.replace('?test', `?test&quality=${q}`));
+    await qp.waitForFunction(() => window.__hue?.useGame.getState().phase === 'ready', null, { timeout: 90000 });
+    await qp.waitForTimeout(800);
+    const r = await qp.evaluate(() => { const Q = window.__hue.quality; const before = Q.getState().level; const moved = Q.getState().down() || Q.getState().up(); return { before, moved, after: Q.getState().level, canvas: !!document.querySelector('canvas') }; });
+    check(`quality ${q}: loads and draws without errors, and the monitor cannot move a forced tier`, r.before === q && !r.moved && r.after === q && r.canvas && qerr.length === 0, `${JSON.stringify(r)} ${qerr.slice(0, 2).join(' | ')}`);
+    await qctx.close();
+  }
+  const uctx = await browser.newContext({ viewport: { width: 1000, height: 640 } });
+  const up = await uctx.newPage();
+  await up.goto(URL);
+  await up.waitForFunction(() => window.__hue?.useGame.getState().phase === 'ready', null, { timeout: 90000 });
+  const steps = await up.evaluate(() => { const Q = window.__hue.quality.getState(); const out = [Q.level]; out.push(Q.down(), window.__hue.quality.getState().level, Q.down(), window.__hue.quality.getState().level, Q.down(), window.__hue.quality.getState().level); out.push(Q.up(), window.__hue.quality.getState().level, Q.up(), window.__hue.quality.getState().level, Q.up(), window.__hue.quality.getState().level); return out; });
+  check('quality steps down 2 > 1 > 0, then says so (the resolution goes next), and back up 0 > 1 > 2', JSON.stringify(steps) === JSON.stringify([2, true, 1, true, 0, false, 0, true, 1, true, 2, false, 2]), JSON.stringify(steps));
+  await uctx.close();
+}
+
+// 8. A model that cannot be downloaded (a bad connection) ends in a plain message with a reload button, not a loading bar that never finishes or the framework's own error page.
+{
+  const ectx = await browser.newContext({ viewport: { width: 900, height: 560 } });
+  const ep = await ectx.newPage();
+  await ep.route(/\.glb(\?|$)/, (r) => r.abort()); // (the models' addresses carry ?v=<deploy>)
+  await ep.goto(URL.replace('?test', '?level=home'));
+  const shown = await ep.getByText('the game could not load', { exact: false }).first().waitFor({ timeout: 20000 }).then(() => true, () => false);
+  const btn = shown && (await ep.locator('button.ui-cta', { hasText: /reload/i }).count()) === 1;
+  const text = (await ep.locator('body').innerText()).toLowerCase();
+  check('a model that cannot be downloaded shows a plain message and a reload button', shown && btn && !text.includes("this page couldn't load") && !text.includes('this page couldn’t load'), `shown ${shown}, button ${btn}, ` + text.replace(/\s+/g, ' ').slice(0, 100));
+  await ectx.close();
 }
 
 // 6. Every coin that sits on something (not floating high above it, for a jump or a bounce) has room for Hue to stand within pick-up distance: the street's north-ledge

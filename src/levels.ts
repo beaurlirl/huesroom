@@ -1,4 +1,4 @@
-import { asset } from "./config";
+import { assetV } from "./config";
 import type { CAMERA } from "./config";
 import type { Par } from "./economy";
 
@@ -22,6 +22,12 @@ export type LevelCamera = Partial<typeof CAMERA> & {
   shotBlend?: number;
   /** The camera never leaves this box (the shop's walls: x and z limits), except in the opening, which stands outside the door. */
   confine?: { x0: number; x1: number; z0: number; z1: number };
+  /**
+   * Sight map: the camera checks it can see all of Hue against what is solid in the room (rasterised from the model once it has loaded; needs `confine`). Where the shots and zones
+   * below put it somewhere it cannot, it moves to the nearest spot that can: closer to him, then higher, then round to the side. `release`: seconds the shot's own camera must see
+   * him again before the camera goes back to it; `cell`: the map's cell size (m); `lookLag`: the most (m) the point the camera looks at may trail his chest; `open`: how much farther back (a fraction of its distance) the camera may stand where it sees him and the way back is clear, to show the size of the place.
+   */
+  sight?: { cell?: number; release?: number; lookLag?: number; open?: number };
   /** Keep Hue in view: if a tall fixture (a collider with `view_block` in its data) would hide him from where the camera is, the camera rises or slides until it can see him. */
   keepInView?: boolean;
   /** A last smoothing over the camera's position (seconds), so cutting from one shot to another never pops. Off when missing. */
@@ -59,6 +65,16 @@ export type LevelDef = {
   winLine: string;
   /** "room": the fixed room lights. "street": the sun follows Hue along the street, on the camera's side. "shop": the room's indoor lights, following Hue through a long interior. */
   lighting: "room" | "street" | "shop";
+  /**
+   * A roof over the level: a flat ceiling (with light panels) at height `y` over the box x0..x1, z0..z1, drawn from below only, so a camera above it still looks in. It has no
+   * collider, so `y` must be higher than he can ever reach (the highest standable surface plus a jump, and his height).
+   */
+  ceiling?: { y: number; x0: number; x1: number; z0: number; z1: number };
+  /**
+   * His drawn body stands on the drawn surface under his feet: where the invisible box he walks on is a hand below a row of cartons, or above the gap between them, his body is eased up
+   * (or a little down) to what you can see, so he never sinks into a top or hovers over it. The physics, and so every route, is untouched (see src/surface.ts).
+   */
+  snapFeet?: boolean;
   /** Hue's silhouette shows through whatever stands in front of him (a soft blue outline), so he is never lost behind a shelf or a counter. */
   xray?: boolean;
   camera?: LevelCamera;
@@ -79,7 +95,7 @@ export const LEVELS: readonly LevelDef[] = [
     number: 1,
     name: "home",
     mode: "run",
-    room: asset("/room/room.glb"),
+    room: assetV("/room/room.glb"),
     spawn: "SPAWN_Hue_chair",
     start: "chair",
     winLine: "hue made it outside",
@@ -92,7 +108,7 @@ export const LEVELS: readonly LevelDef[] = [
     number: 2,
     name: "ludlow st",
     mode: "run",
-    room: asset("/levels/street/room.glb"),
+    room: assetV("/levels/street/room.glb"),
     spawn: "SPAWN_Hue_start",
     start: "stand",
     winLine: "hue made it to the deli",
@@ -119,18 +135,21 @@ export const LEVELS: readonly LevelDef[] = [
     number: 3,
     name: "the deli",
     mode: "run",
-    room: asset("/levels/deli/room.glb"),
+    room: assetV("/levels/deli/room.glb"),
     spawn: "SPAWN_Hue_start",
     start: "stand",
     winLine: "hue got what he came for",
     lighting: "shop",
-    xray: true,
+    snapFeet: true,
+    // The roof: the highest thing he can stand on is 1.98 m, a jump from it takes his head to 3.04 m, so 3.1 m is a hand above anything he can do.
+    ceiling: { y: 3.1, x0: -3.84, x1: 3.7, z0: -2.37, z1: 2.37 },
     camera: {
       // The deli is 7.7 m long and 4.7 m deep (a real deli at 0.65, so Hue is about 2 and a third feet tall in it). The camera follows him
       // loosely along the shop and rises with his depth, to look over the shelves. A narrower lens than the room's keeps Hue big on screen.
       fov: 40,
       fovFar: 34,
       confine: { x0: -3.78, x1: 3.78, z0: -2.7, z1: 2.45 },
+      sight: { open: 0.55 },
       keepInView: true,
       shotBlend: 1.1,
       finalSmooth: 0.3,
@@ -138,7 +157,8 @@ export const LEVELS: readonly LevelDef[] = [
       xMin: -3.9,
       xMax: 3.9,
       yMin: 0.5,
-      yMax: 3.8,
+      // Under the roof (the ceiling above, 3.1 m): the camera is always inside the shop.
+      yMax: 2.95,
       roomDepth: 4.75,
       offsetNear: 1.3,
       offsetFar: 2.4,
@@ -151,7 +171,7 @@ export const LEVELS: readonly LevelDef[] = [
       ladderMinX: 2.6,
       ladderMinZ: 0.5,
       ladderMinY: -1,
-      ladderCamY: 3.1,
+      ladderCamY: 2.95,
       cornerMirror: -1,
       // The grill line (the staff aisle between the deli case and the hot line): the camera stands at its front end and looks down it as Hue
       // runs along, because from the open side the equipment hides him.

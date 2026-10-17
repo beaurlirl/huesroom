@@ -13,7 +13,8 @@ import { isRunning, runtime, useGame } from "./store";
 import { useHueController } from "./useHueController";
 import { theme } from "./ui/theme";
 import { useLevel, useRoom } from "./useLevel";
-import { roomColliders } from "./Room";
+import { blenderName, roomColliders } from "./Room";
+import { SurfaceMap } from "./surface";
 
 const IDLE_INPUT = { moveX: 0, moveZ: 0, run: false, jump: false };
 
@@ -38,12 +39,44 @@ function useSpawn() {
   }, [scene, level]);
 }
 
+/** How far to move his drawn body (m, up is positive) so it stands on the highest drawn top within a hand of his feet: up to a hand up, a little down, and nothing for a difference too small to see. */
+function feetLift(surface: SurfaceMap, x: number, y: number, z: number) {
+  // Under his whole footprint, not just the one point: standing on the edge of a carton is standing on the carton.
+  let top: number | null = null;
+  for (const [dx, dz] of FOOTPRINT) {
+    const t = surface.topNear(x + dx, z + dz, y, 0.25);
+    if (t !== null && (top === null || t > top)) top = t;
+  }
+  if (top === null) return 0;
+  const d = top - y;
+  return Math.abs(d) < 0.012 ? 0 : THREE.MathUtils.clamp(d, -0.1, 0.25);
+}
+const FOOTPRINT: [number, number][] = [[0, 0], [0.03, 0], [-0.03, 0], [0, 0.03], [0, -0.03]];
+
 export function Hue() {
   const gltf = useGLTF(ASSETS.hue, ASSETS.draco);
   const animGltfs = useGLTF(CLIP_NAMES.map(ASSETS.anim));
   const spawn = useSpawn();
   const level = useLevel();
   const phase = useGame((s) => s.phase);
+  const { scene: roomScene } = useRoom();
+
+  // levels.ts `snapFeet`: the drawn tops of the level, so his drawn body stands on what is drawn (see surface.ts). Built in slices after the level has loaded.
+  const surface = useMemo(() => {
+    if (!level.snapFeet) return null;
+    const box = new THREE.Box3().setFromObject(roomScene);
+    const m = new SurfaceMap(box.min.x - 0.2, box.min.z - 0.2, 0.04, box.max.x - box.min.x + 0.4, box.max.z - box.min.z + 0.4);
+    m.add(roomScene, (mesh) => {
+      if (!mesh.visible) return false;
+      for (let o: THREE.Object3D | null = mesh; o; o = o.parent) {
+        const n = blenderName(o);
+        if (n.startsWith("COL_") || n.startsWith("COIN_") || n.startsWith("BOOK_KICK") || o.userData.sensor) return false;
+      }
+      return true;
+    });
+    return m;
+  }, [roomScene, level]);
+  const lift = useRef(0);
 
   const root = gltf.scene.children[0]; // "Hue | 0.4572m placement"
   const armature = root.children[0];
@@ -186,10 +219,21 @@ export function Hue() {
     };
   }, [controller, anim]);
 
+  // For tests: how far his drawn body would be moved at a spot.
+  useEffect(() => {
+    runtime.debug.feetLift = surface ? (x, y, z) => (surface.ready ? feetLift(surface, x, y, z) : 0) : null;
+    runtime.debug.surface = surface;
+    return () => {
+      runtime.debug.feetLift = null;
+      runtime.debug.surface = null;
+    };
+  }, [surface]);
+
   // Below every collider in the level there is nothing left to land on: he fell out of the world (a gap in a wall, a ledge over the edge). Back to the start, not into the void.
   const fallY = useRef<number | null>(null);
 
   useFrame((_, rawDt) => {
+    if (surface && !surface.ready) surface.step(3);
     if (!isRunning()) {
       controller.get()?.disarmJump();
       return;
@@ -210,6 +254,12 @@ export function Hue() {
       runtime.debug.probe = mover.debugProbe;
       root.position.copy(mover.feet);
       root.position.y -= MOVE.offset; // the controller keeps a skin gap under the capsule
+      // Standing on a drawn top that is above (a row of cartons) or below (a gap between them) the box he really stands on: his drawn body follows the drawn surface, up a hand and down a little.
+      // Only when he is on the ground; the physics (and so every route and jump) is untouched.
+      let want = 0;
+      if (surface?.ready && mover.mode === "ground" && runtime.grounded) want = feetLift(surface, mover.feet.x, mover.feet.y, mover.feet.z);
+      lift.current += (want - lift.current) * (1 - Math.exp(-dt / 0.06));
+      root.position.y += lift.current;
       root.rotation.set(0, mover.yaw, 0);
     }
     anim.update(dt);

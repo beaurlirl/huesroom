@@ -12,6 +12,8 @@ import { listedClips, loadedClips, musicPlaying } from "./audio/sfx";
 import { bookBodies, Books } from "./Books";
 import { pushableBodies } from "./pushables";
 import { CameraRig } from "./CameraRig";
+import { Ceiling } from "./Ceiling";
+import { useQuality } from "./quality";
 import { Coins } from "./Coins";
 import { Hud, useIsTouch } from "./Hud";
 import { useTouchInput } from "./input";
@@ -149,6 +151,7 @@ export default function Game() {
           pushables: pushableBodies,
           touch: useTouchInput,
           audio: { loadedClips, listedClips, musicPlaying },
+          quality: useQuality,
         },
       });
   }, [setDebug]);
@@ -179,11 +182,20 @@ export default function Game() {
         }}
       >
         <color attach="background" args={["#ffffff"]} />
+        {/* When the frame rate drops: the costliest effects go first, then the resolution; when it recovers: the resolution comes back first, then the effects. */}
         <PerformanceMonitor
-          onDecline={() => setDpr((d) => Math.max(1, d - 0.25))}
-          onIncline={() => setDpr((d) => Math.min(maxDpr, d + 0.25))}
+          onDecline={() => {
+            if (!useQuality.getState().down()) setDpr((d) => Math.max(1, d - 0.25));
+          }}
+          onIncline={() => {
+            if (dpr < maxDpr) setDpr((d) => Math.min(maxDpr, d + 0.25));
+            else useQuality.getState().up();
+          }}
           flipflops={3}
-          onFallback={() => setDpr(1)}
+          onFallback={() => {
+            useQuality.getState().floor();
+            setDpr(1);
+          }}
         />
         <Suspense fallback={null}>
           <RoomLoaded />
@@ -198,6 +210,7 @@ export default function Game() {
               paused={paused || phase === "resetting"}
             >
               <Room />
+              <Ceiling />
               <Hue />
               <Coins />
               <Doors />
