@@ -166,6 +166,19 @@ await page.waitForFunction(() => ['resetting', 'intro', 'ready'].includes(window
   await uctx.close();
 }
 
+// 8. A model that cannot be downloaded (a bad connection) ends in a plain message with a reload button, not a loading bar that never finishes or the framework's own error page.
+{
+  const ectx = await browser.newContext({ viewport: { width: 900, height: 560 } });
+  const ep = await ectx.newPage();
+  await ep.route('**/*.glb', (r) => r.abort());
+  await ep.goto(URL.replace('?test', '?level=home'));
+  const shown = await ep.getByText('the game could not load', { exact: false }).first().waitFor({ timeout: 20000 }).then(() => true, () => false);
+  const btn = shown && (await ep.locator('button.ui-cta', { hasText: /reload/i }).count()) === 1;
+  const text = (await ep.locator('body').innerText()).toLowerCase();
+  check('a model that cannot be downloaded shows a plain message and a reload button', shown && btn && !text.includes("this page couldn't load") && !text.includes('this page couldn’t load'), `shown ${shown}, button ${btn}, ` + text.replace(/\s+/g, ' ').slice(0, 100));
+  await ectx.close();
+}
+
 // 6. Every coin that sits on something (not floating high above it, for a jump or a bounce) has room for Hue to stand within pick-up distance: the street's north-ledge
 // coin was 6 cm too far under a fire-escape deck, nobody could pick it up, and the level could not be won. (npm run test:reach proves the whole route; this names the coin.)
 for (const level of ['home', 'street', 'deli']) {
