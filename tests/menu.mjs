@@ -1,4 +1,5 @@
-// The home menu: shows on the plain address with the locations, sound switches and policy links; a direct ?level= link skips it; pause and the win screen can come back to it.
+// The home menu: shows on the plain address with the locations, sound switches and policy links, and with no level loaded behind it (no canvas, no model download);
+// choosing a location loads that one in a fresh page (?level=<id>); a direct ?level= link skips the menu; pause can come back to it.
 // Needs the dev server (npx next dev -p 3100).
 import { chromium } from 'playwright-core';
 const BASE = process.env.BASE ?? 'http://localhost:3100';
@@ -10,12 +11,26 @@ const page = await (await browser.newContext({ viewport: { width: 1000, height: 
 page.on('pageerror', (e) => errors.push(e.message));
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text().slice(0, 160)); });
 const shotDir = process.env.SHOTS;
+const models = [];
+page.on('request', (r) => { const path = new URL(r.url()).pathname; if (path.endsWith('.glb')) models.push(path); });
+// The menu loads a location in a fresh page (?level=<id>): wait for it, then begin with a key, as a player does.
+const beginLevel = async (id) => {
+  await page.waitForURL(new RegExp(`[?&]level=${id}(&|$)`), { timeout: 20000 });
+  await page.getByText('press any key', { exact: false }).waitFor({ timeout: 90000 });
+  await page.keyboard.press('Space');
+  // The prompt stays (fading) while he stands up from the chair and is removed once he is playing.
+  await page.getByText('press any key', { exact: false }).waitFor({ state: 'detached', timeout: 20000 });
+  await page.waitForFunction(() => /\d\d\s*\/\s*\d\d/.test(document.body.innerText), null, { timeout: 10000 });
+};
 
 // 1. The plain address opens the menu.
 await page.goto(BASE + '/');
 await page.getByRole('link', { name: 'privacy' }).waitFor({ timeout: 90000 });
 const text = (await page.locator('body').innerText()).toLowerCase();
 check('the menu opens on the plain address', true);
+await page.waitForTimeout(2000); // long enough for a scene to start downloading, if one were going to
+check('no level is loaded behind it: no canvas', (await page.locator('canvas').count()) === 0);
+check('and no model is downloaded', models.length === 0, models.join(', '));
 check('it lists the three locations', ['home', 'ludlow st', 'the deli'].every((n) => text.includes(n)), text.slice(0, 120).replace(/\n/g, ' | '));
 check('nothing played yet says so', (text.match(/not played/g) ?? []).length === 3);
 check('it has no "press any key" prompt under it', !text.includes('press any key'));
@@ -57,23 +72,26 @@ for (const [name, heading] of [['privacy', 'Privacy'], ['support', 'Support'], [
   await page.getByRole('link', { name: 'privacy' }).waitFor({ timeout: 60000 });
 }
 
-// 4. Play begins the first location.
+// 4. Play loads the first location (a fresh page, ?level=home); a key then begins the run.
 await page.getByRole('button', { name: 'play' }).first().click();
-await page.getByText('coins', { exact: false }).first().waitFor({ timeout: 20000 });
-await page.waitForTimeout(2500);
+await beginLevel('home').then(
+  () => check('play loads the first location and a key starts the run (the coin counter shows)', true),
+  (e) => check('play loads the first location and a key starts the run (the coin counter shows)', false, `${e.message.split('\n')[0]} @ ${page.url()}`),
+);
 const hud = (await page.locator('body').innerText()).toLowerCase();
-check('play starts the run (the coin counter shows)', /\d\d\s*\/\s*11/.test(hud), hud.replace(/\n/g, ' ').slice(0, 120));
+check('the counter is level 1\'s 11 coins', /\d\d\s*\/\s*11/.test(hud), hud.replace(/\n/g, ' ').slice(0, 120));
+check('its model downloaded only now', models.some((m) => /room\.glb$/.test(m)), models.join(', '));
 
 // 4b. Enter on the focused play button begins it too (the keyboard way in).
 await page.goto(BASE + '/');
 await page.getByRole('link', { name: 'privacy' }).waitFor({ timeout: 90000 });
 await page.waitForFunction(() => (document.activeElement?.matches('button') && (document.activeElement.textContent ?? '').toLowerCase().includes('play')), null, { timeout: 8000 });
 await page.keyboard.press('Enter');
-await page.waitForFunction(() => /\d\d\s*\/\s*11/.test(document.body.innerText), null, { timeout: 30000 }).then(
+await beginLevel('home').then(
   () => check('Enter on the focused play button starts the run', true),
-  () => check('Enter on the focused play button starts the run', false),
+  (e) => check('Enter on the focused play button starts the run', false, e.message.split('\n')[0]),
 );
-await page.waitForTimeout(4000); // the rise from the chair
+await page.waitForTimeout(1000);
 
 // 5. Pause has a menu button that comes back here.
 await page.keyboard.press('Escape');

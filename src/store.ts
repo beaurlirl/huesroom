@@ -19,15 +19,6 @@ function initialLevelId() {
   if (typeof window === "undefined") return LEVELS[0].id;
   return levelById(new URLSearchParams(window.location.search).get("level")).id;
 }
-/**
- * The home menu (levels, sound, policies) opens on the plain address (what the app and the web home open): `?level=`, `?test` and `?debug` are for
- * going straight to a level, so scripted tests and links to one level skip it.
- */
-function initialMenu() {
-  if (typeof window === "undefined") return false;
-  const q = new URLSearchParams(window.location.search);
-  return !q.has("level") && !q.has("test") && !q.has("debug");
-}
 /** Restart: the room fogs over to white glass before it resets behind it. */
 export const RESET_FADE_MS = 650;
 
@@ -88,10 +79,7 @@ type GameState = {
   totalCoins: number;
   /** Everything is loaded and the scene has settled; the title card can clear. */
   sceneReady: boolean;
-  /** The home menu is up (it shows where the `press any key` prompt would be). */
-  menuOpen: boolean;
-  setMenuOpen: (open: boolean) => void;
-  /** Back to the home menu: the room fogs over to white, then the page reloads on the plain address. */
+  /** Back to the home menu: the room fogs over to white, then the page reloads on the plain address (which opens the menu, and nothing of a level). */
   goToMenu: () => void;
   /** A line to show over the game for as long as it is true (a locked coin's reason), or null. */
   hint: string | null;
@@ -123,8 +111,6 @@ export const useGame = create<GameState>((set, get) => ({
   result: null,
   wonAt: 0,
   hint: null,
-  menuOpen: initialMenu(),
-  setMenuOpen: (menuOpen) => set({ menuOpen }),
   goToMenu: () => {
     const { phase, sceneReady } = get();
     if (phase === "loading" || phase === "resetting" || !sceneReady) return;
