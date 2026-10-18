@@ -88,6 +88,44 @@ export const MOVE = {
   airPoseDelay: 0.08,
 };
 
+/**
+ * Skateboard levels (levels.ts mode "skate"). He rolls along the level's lane (the line through his spawn, in the direction he faces); the left stick pushes, a flick of the
+ * right stick (or Space, or the pad's A) pops an ollie, and a rail he lands on carries him along it by itself. Metres and seconds, at his 0.457 m size.
+ */
+export const SKATE = {
+  /** Stick forward speeds him up this fast (m/s per s) while the board is on the ground, up to `maxSpeed`. */
+  pushAccel: 1.5,
+  /** Rolling with the stick let go: how fast he loses speed (m/s per s). He never stops dead by himself below `coastFloor`. */
+  rollFriction: 0.22,
+  coastFloor: 0.9,
+  /** Stick back brakes at this rate (m/s per s). */
+  brake: 3.2,
+  maxSpeed: 2.7,
+  /** Pop speed (m/s): the apex is about ollieSpeed² / (2 · gravity) = 0.34 m, a jump of about 0.8 s over 1.7 m at 2.4 m/s. */
+  ollieSpeed: 1.9,
+  gravity: 5.3,
+  /** A fall that did not start with an ollie (rolling off an edge) uses this. */
+  fallGravity: 9,
+  maxFall: 6,
+  /** Pop a hair after leaving the ground, or a hair before landing, and it still counts (s). */
+  coyote: 0.09,
+  popBuffer: 0.12,
+  /** Running into something tall: he keeps this much of his speed (a bump, not a crash). */
+  bumpKeep: 0.12,
+  /** Leaving a ramp's lip keeps its upward speed, up to this (m/s). */
+  launchMax: 2.4,
+  /** Rails: the feet catch a rail within `catchWidth` of its line sideways, from `below` under to `above` over it, if not rising faster than `maxRise`. */
+  rail: { catchWidth: 0.09, below: 0.06, above: 0.1, maxRise: 0.6, endMargin: 0.03, minSpeed: 1.3, exitHop: 0.35, recatch: 0.3 },
+  /**
+   * The camera rides behind him on the lane (SkateCamera.tsx), centred, looking down the road: `dist` metres behind at a standstill, `distFast` more at full speed, `height` above his
+   * feet, aimed at the lane `lookAhead` metres in front of him and `lookHeight` above the ground there. The lens widens by `fovFast` degrees at full speed. `follow` is how closely
+   * (s) it keeps up along the lane, `rise` how closely it follows the ground's height (a jump does not lift it past `deadzone`).
+   */
+  cam: { dist: 1.5, distFast: 0.5, height: 0.72, lookAhead: 3.0, lookHeight: 0.12, fov: 58, fovFast: 9, follow: 0.09, rise: 0.15, deadzone: 0.1 },
+  /** The board's top above the ground (m): his drawn feet stand on it. */
+  deck: 0.036,
+};
+
 export const FLAGS = {
   /** Second jump at 70% take-off speed, once per air time. Off by design. */
   DOUBLE_JUMP: false,

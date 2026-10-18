@@ -7,7 +7,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { Animator } from "./animator";
 import { prepareClips } from "./clips";
-import { ASSETS, CLIP_NAMES, HUE, MOVE, type ClipName } from "./config";
+import { ASSETS, CLIP_NAMES, HUE, MOVE, SKATE, type ClipName } from "./config";
 import { initInput, readInput } from "./input";
 import { isRunning, runtime, useGame } from "./store";
 import { useHueController } from "./useHueController";
@@ -15,14 +15,28 @@ import { theme } from "./ui/theme";
 import { useLevel, useRoom } from "./useLevel";
 import { blenderName, roomColliders } from "./Room";
 import { SurfaceMap } from "./surface";
+import { Lane, readRoute } from "./skate/lane";
+import { readRails } from "./skate/rails";
+import type { SkateMover } from "./skate/SkateMover";
 
-const IDLE_INPUT = { moveX: 0, moveZ: 0, run: false, jump: false };
+const IDLE_INPUT = { moveX: 0, moveZ: 0, run: false, jump: false, pop: false };
 
 const UP = new THREE.Vector3(0, 1, 0);
 
 /** Yaw that turns Hue's local +X (his forward) toward a world XZ direction. */
 export function yawForDirection(x: number, z: number) {
   return Math.atan2(-z, x);
+}
+
+/** A skateboard level before he is placed on the board (the title card, the begin prompt): the lane the camera sits behind him on. */
+function startSkateLane(route: Lane | null, feet: THREE.Vector3, yaw: number) {
+  const lane = route ?? Lane.straight(feet, Math.cos(yaw), -Math.sin(yaw));
+  const S = runtime.skate;
+  S.lane = lane;
+  S.s = lane.project(feet.x, feet.z, 0, Infinity);
+  lane.tangent(S.s, S.dir);
+  S.speed = 0;
+  S.active = true;
 }
 
 function useSpawn() {
@@ -112,7 +126,14 @@ export function Hue() {
 
   const bodyRef = useRef<RapierRigidBody>(null);
   const colliderRef = useRef<RapierCollider>(null);
-  const controller = useHueController(bodyRef, colliderRef, anim, rollCurve, climbRiseSpeed, topOut);
+  // A skateboard level's rails (`RAIL_nn` nodes in its model).
+  const rails = useMemo(() => (level.mode === "skate" ? readRails(roomScene) : []), [roomScene, level]);
+  // ... and its route (a `SKATE_ROUTE` node: the street's own line); without one the lane is straight from the spawn.
+  const route = useMemo(() => {
+    const pts = level.mode === "skate" ? readRoute(roomScene, level.skate?.route ?? "SKATE_ROUTE") : null;
+    return pts ? new Lane(pts) : null;
+  }, [roomScene, level]);
+  const controller = useHueController(bodyRef, colliderRef, anim, rollCurve, climbRiseSpeed, topOut, rails, route);
 
   // First visible frame: a clip is bound, playing and evaluated, and the root is placed.
   useLayoutEffect(() => {
@@ -131,6 +152,7 @@ export function Hue() {
     runtime.feet.copy(startFeet);
     runtime.startFeet.copy(startFeet);
     runtime.grounded = true;
+    if (level.mode === "skate") startSkateLane(route, startFeet, spawn.yaw);
 
     anim.snap(startClip);
     gltf.scene.visible = true;
@@ -139,7 +161,7 @@ export function Hue() {
     return () => {
       runtime.hueReady = false;
     };
-  }, [gltf.scene, root, anim, spawn, startFeet, startClip]);
+  }, [gltf.scene, root, anim, spawn, startFeet, startClip, level, route]);
 
   // X-ray (levels.ts `xray`): a second copy of every one of his meshes, drawn only where something is in front of him (the depth test is flipped, and nudged toward the camera so it never competes with his own surface), in the
   // brand blue. It shares his skeleton, so it moves with him; the shelves and counters of a crowded level can then never hide him.
@@ -214,8 +236,11 @@ export function Hue() {
       mover.place(new THREE.Vector3(x, y, z), (yawDeg * Math.PI) / 180);
       anim.play("idle", { fade: 0 });
     };
+    // (tests, skateboard levels) roll at a speed at once.
+    runtime.debug.skateSpeed = (v) => (controller.get() as SkateMover | null)?.setSpeed?.(v);
     return () => {
       runtime.debug.teleport = null;
+      runtime.debug.skateSpeed = null;
     };
   }, [controller, anim]);
 
@@ -243,7 +268,7 @@ export function Hue() {
     const mover = controller.get();
     if (mover && (phase === "playing" || phase === "won")) {
       const scripted = runtime.debug.input;
-      const input = scripted ? { moveX: scripted.x, moveZ: -scripted.z, run: scripted.run, jump: scripted.jump } : readInput();
+      const input = scripted ? { moveX: scripted.x, moveZ: -scripted.z, run: scripted.run, jump: scripted.jump, pop: scripted.pop } : readInput();
       mover.update(dt, phase === "playing" ? input : IDLE_INPUT);
       if (fallY.current === null && roomColliders.length) fallY.current = Math.min(...roomColliders.map((c) => c.center.y - c.halfExtents.y)) - 1;
       if (fallY.current !== null && mover.feet.y < fallY.current) {
@@ -260,6 +285,7 @@ export function Hue() {
       if (surface?.ready && mover.mode === "ground" && runtime.grounded) want = feetLift(surface, mover.feet.x, mover.feet.y, mover.feet.z);
       lift.current += (want - lift.current) * (1 - Math.exp(-dt / 0.06));
       root.position.y += lift.current;
+      if (level.mode === "skate") root.position.y += SKATE.deck; // he stands on the board's deck
       root.rotation.set(0, mover.yaw, 0);
     }
     anim.update(dt);

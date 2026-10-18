@@ -122,9 +122,9 @@ export function Room() {
     roomColliders.push(...list);
     const south = list.find((c) => c.name === "COL_Boundary south");
     if (south) runtime.openWallZ = south.center.z - south.halfExtents.z;
-    else console.warn("room model: COL_Boundary south missing; using default open-wall z");
+    else if (level.mode !== "skate") console.warn("room model: COL_Boundary south missing; using default open-wall z");
     return { colliders: list, hull: beanbagHull(scene) };
-  }, [scene]);
+  }, [scene, level]);
 
   // levels.ts `paint`: colour for materials the model left plain.
   useLayoutEffect(() => {

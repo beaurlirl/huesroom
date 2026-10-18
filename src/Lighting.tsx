@@ -70,7 +70,9 @@ export function Lighting() {
     if (!follow) return;
     if (rig.current) {
       rig.current.position.x = runtime.feet.x;
-      if (!outdoor) rig.current.position.z = runtime.feet.z; // a shop is deep as well as long
+      // A shop is deep as well as long; so is a skateboard lane, which also turns the rig so the key stays behind the camera.
+      if (!outdoor || level.mode === "skate") rig.current.position.z = runtime.feet.z;
+      if (level.mode === "skate") rig.current.rotation.y = Math.atan2(-runtime.skate.dir.x, -runtime.skate.dir.z);
     }
     if (key.current && outdoor) key.current.position.z = THREE.MathUtils.lerp(3.6, -3.6, runtime.camFlip);
   });

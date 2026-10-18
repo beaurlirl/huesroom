@@ -57,6 +57,42 @@ The model's nodes are the level (Blender names; GLTFLoader's sanitised ones are 
 | Drops | over 0.2 m is a hop landing (brief control lock); over 0.9 m is a roll (longer lock) |
 | Coins | picked up within about 0.14 m of the body; a jump reaches about 0.9 m above a standing surface |
 
+### Skate levels
+
+A level with `mode: "skate"` is ridden on a skateboard along one **lane**, with the camera behind him (its own camera, `src/skate/SkateCamera.tsx`, instead of the wall-plane one): he is dead centre
+with his back to us, looking down the road, and he only ever goes forward. The lane is the level's **route** (a `SKATE_ROUTE` node: the street's own line, bends and hills included), or, for a
+level without one, a straight line from the spawn node in the direction it faces (`facing_xy`). Nothing steers him sideways, so everything he meets (obstacles, rails, coins, the finish) sits on
+the lane. The level ends at a finish line, not at the last coin: its coins are picked up on the way and whatever he collected is banked.
+
+**Controls.** Left stick (W / S, the arrows): up pushes (it speeds him up, to 2.7 m/s), down brakes; sideways does nothing. Ollie: flick the right stick (pull it back and push it forward again in one quick
+movement, within about 0.45 s; the other way round works too), or Space, or the pad's A. On a phone the jump button is replaced by a second stick. On a rail he rides to the end by
+himself; an ollie takes him off early. Running into something tall costs him most of his speed and nothing else (there is no failing).
+
+`levels.ts` gives the level `skate: { finish: "<node>", route?: "<node>", camera?: {...} }`; the code is in `src/skate/` (`SkateMover.ts` the rider, `lane.ts` the path, `SkateCamera.tsx`,
+`rails.ts`, `flick.ts`, `SkateScene.tsx` the board and the finish) and every number is in `SKATE` in `src/config.ts` (`SKATE.cam` for the camera).
+
+| Node | | What it does |
+|---|---|---|
+| `COL_*` boxes | required | As in any level. Obstacles are ordinary colliders; a rail's supports too. (Only boxes so far: no mesh colliders) |
+| `SKATE_ROUTE` | optional | An empty whose `route` user data is a list of `[x, y, z]` points (the model's world axes, y up) in riding order: the path he rides and the camera follows. Points a metre or two apart are plenty; the spawn must be on it. Without it the lane is straight from the spawn |
+| `RAIL_01`, `RAIL_02`, … | optional | A hidden box per rail: its **long side is the rail** and its **top face is the line he grinds along** (it may slope). It has no collider of its own: the visible rail is ordinary geometry, and under it a `COL_*` ledge or its supports must stop a board that rolls into it (top about 3 cm under the grind line) |
+| `COIN_nn` | required | As in any level. Over an obstacle, in an arc; above a rail, in a line (numbers below). The coin disc faces down the lane |
+| the finish node (`skate.finish`) | required | The run is won the first time he has ridden past it along the lane |
+| the spawn node | required | As in any level; he starts on the board, standing still, facing along the lane |
+
+**Numbers** (his size; the board is about 0.2 m long). Rolling speed 0.9 (coasting) to 2.7 m/s. An ollie rises about **0.34 m** and stays up about 0.7 s, travelling 1.4 to 1.9 m
+at 2 to 2.7 m/s. He steps up anything under 0.10 m without a jump, so an obstacle is **0.11 m or taller**; **0.22 m** needs a well-timed pop; over about 0.30 m is out of reach.
+Rail lines work from **0.18 to 0.30 m** up (the board is caught from 6 cm under to 10 cm over the line, coming down, not rising faster than 0.6 m/s). A kicker's slope may be up to
+45 degrees; it throws him up the way he was rising when he leaves the lip. The camera stands 1.5 m behind him (2 m at full speed) and 0.7 m up, and looks 3 m ahead.
+
+**Coins.** A coin is picked up within 0.14 m of his body, which spans 0.06 to 0.40 m above his feet, so on the ground he reaches a coin up to 0.54 m high. A coin meant to need a jump
+or a grind is centred **0.58 m or more** above the ground (or above the rail line he is on). Over an obstacle: an arc at least as long as the obstacle plus 0.3 m, 0.58 m up at the
+ends and about 0.16 m higher in the middle. Above a rail: a line of coins 0.47 m over the grind line, one every 0.25 m. After a kicker: along the flight, 0.38 m over his feet.
+`scripts/build_skate_yard.py` has these as `arc_coins`, `rail_coins` and `air_coins`.
+
+**The test yard.** `?level=skate-yard` (not offered to players: `live: false`) is a straight lane with a kerb, a barrier, a double kerb, a kicker and two rails, 37 coins and a finish,
+built by `python3 scripts/build_skate_yard.py` with no Blender. It exists to build and test the skate gameplay before any real level model, and is the worked example of the table above.
+
 Still specific to level 1, so the next level will need its own: the seated start (Hue stands up
 from a chair; a street has no chair), the camera zones in `CAMERA` (beanbag corner, ladder), the
 lighting rig in `Lighting.tsx`, the win line ("hue made it outside"), and the single best-time key.
@@ -71,6 +107,8 @@ npm run test:routes    # every route in prompt 1.5, via teleport + scripted inpu
 npm run test:qa        # 30 end-to-end checks: intro lock, timer, keyboard play, pause, restart,
                        # win + best time, pose monitor, audio, touch UI, console errors
 npm run test:street    # level 2: the level checks and its 27 route legs
+npm run test:skate     # the skateboard: the ollie flick and the rail geometry (no browser), then the test yard in virtual time: pushing and braking, the ollie
+                       # at 32/64/128 fps, the right-stick path, bumps, the kicker, grinding a rail and popping off it, the coins, the finish line
 npm run test:deli      # level 3: the camera (never inside a fixture; round the middle shelf; and tests/camera-audit.mjs: Hue in sight
                        # on every frame of the recorded route and at every spot he can reach) and the ladders
 npm run test:flow      # the win screen's keys, falling out of the world, the deli's wall height
@@ -101,6 +139,7 @@ level for what Hue can reach (and any hole in the level) with the real physics, 
 | `src/quality.ts` | desktop effect tiers (2 everything, 1 no ambient shading, 0 just the tone mapping and colour grade); the frame-rate monitor in `Game.tsx` steps them down before it lowers the resolution; `?quality=0|1|2` forces one |
 | `src/camera/sight.ts` | the camera's sight map (levels.ts `camera.sight`; the deli): the room's solid meshes in a grid, so the camera can tell it sees Hue and, if not, find the nearest spot that does. `tests/dev/` has the scratch tools used to tune it |
 | `src/Room.tsx` | room, colliders from `COL_*` (retired ones skipped), beanbag hull, squash |
+| `src/skate/` | the skateboard levels: the rider (`SkateMover.ts`), the right-stick flick, the rails, the board and the finish line (see "Skate levels") |
 | `src/Coins.tsx`, `src/fx/` | coins, glints, smoke, coin reflection map, instanced sprites |
 | `src/Books.tsx` | kickable books |
 | `src/Hud.tsx`, `src/ui/`, `src/ShareCard.tsx` | HUD, menus, share card. **Restyle in `ui/theme.ts` + `ShareCard.tsx`** |

@@ -1,13 +1,24 @@
 import { assetV } from "./config";
 import type { Paint } from "./paint";
-import type { CAMERA } from "./config";
+import type { CAMERA, SKATE } from "./config";
 import type { Par } from "./economy";
 
 /**
  * How a level plays. `run`: timed, with a best time (and, later, medals). `explore`: a relaxed
- * walk-through with no clock, for levels that are more exhibit than obstacle course.
+ * walk-through with no clock, for levels that are more exhibit than obstacle course. `skate`: Hue rides a skateboard along the
+ * level's lane (see `skate` below); timed like `run`, but it ends at a finish line and its coins are optional.
  */
-export type LevelMode = "run" | "explore";
+export type LevelMode = "run" | "explore" | "skate";
+
+/** A skateboard level's settings (see "Skate levels" in the README for what its model needs). */
+export type SkateDef = {
+  /** Node in the model where the run ends: the first time his feet pass its position along the lane, he wins. */
+  finish: string;
+  /** Node in the model whose `route` user data is the path he rides: a list of [x, y, z] points (the model's world axes, y up) in riding order. Without one the lane is straight from the spawn, the way it faces. Default "SKATE_ROUTE". */
+  route?: string;
+  /** Any of the SKATE.cam numbers, for a level that wants the camera nearer, higher or wider. */
+  camera?: Partial<typeof SKATE.cam>;
+};
 
 /** Per-level camera settings: any of the CAMERA numbers, plus the street-only options below. */
 export type LevelCamera = Partial<typeof CAMERA> & {
@@ -81,6 +92,8 @@ export type LevelDef = {
   /** Hue's silhouette shows through whatever stands in front of him (a soft blue outline), so he is never lost behind a shelf or a counter. */
   xray?: boolean;
   camera?: LevelCamera;
+  /** Only for mode "skate". */
+  skate?: SkateDef;
   /** Speed bonus for `run` levels (see economy.ts). Times are seconds; tune them against real runs. */
   par?: Par;
   /** Nodes flagged `haze` in the model fade to white beyond these x limits, over `span` metres (the blurry ends of a street). */
@@ -226,6 +239,21 @@ export const LEVELS: readonly LevelDef[] = [
     },
     par: { fast: 120, slow: 360, bonusMax: 40 },
     live: true,
+  },
+  {
+    // The skateboard test yard: a flat lane with obstacles, a kicker, rails and coins over all of them, ridden from behind (scripts/build_skate_yard.py). Not offered to players.
+    id: "skate-yard",
+    number: 4,
+    name: "skate yard",
+    mode: "skate",
+    room: assetV("/levels/skate-yard/room.glb"),
+    spawn: "SPAWN_Hue_start",
+    start: "stand",
+    winLine: "hue rolled the whole way",
+    lighting: "street",
+    skate: { finish: "SKATE_FINISH" },
+    par: { fast: 9, slow: 40, bonusMax: 10 },
+    live: false,
   },
 ];
 

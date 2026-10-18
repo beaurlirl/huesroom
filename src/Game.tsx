@@ -33,7 +33,9 @@ import { ShareButton, ShareSnapshot } from "./ShareCard";
 import { SprayCans } from "./SprayCans";
 import { TouchControls } from "./TouchControls";
 import { runtime, useGame } from "./store";
-import { getLevel, useRoom } from "./useLevel";
+import { getLevel, useLevel, useRoom } from "./useLevel";
+import { SkateCamera } from "./skate/SkateCamera";
+import { SkateBoard, SkateFinish } from "./skate/SkateScene";
 import { Overlay } from "./ui/Overlay";
 import { theme } from "./ui/theme";
 
@@ -128,6 +130,7 @@ export default function Game() {
   const setDebug = useGame((s) => s.setDebug);
   const paused = useGame((s) => s.paused);
   const phase = useGame((s) => s.phase);
+  const skating = useLevel().mode === "skate";
   useHotkeys();
   const coarse = useIsTouch();
   // Adaptive resolution: start at the cap (1.5 on phones, 2 on desktop) and step down if the
@@ -212,13 +215,15 @@ export default function Game() {
               <Room />
               <Ceiling />
               <Hue />
+              {skating && <SkateBoard />}
+              {skating && <SkateFinish />}
               <Coins />
               <Doors />
               <StockWiggle />
               <Books />
               <SprayCans />
             <ExposeWorld />
-              <CameraRig />
+              {skating ? <SkateCamera /> : <CameraRig />}
               {debug && <DebugView />}
             </Physics>
             <SceneReady />

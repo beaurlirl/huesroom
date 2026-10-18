@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { create } from "zustand";
 import type { Reward } from "./economy";
+import type { Lane } from "./skate/lane";
 import { OUTRO } from "./config";
 import { applyRun, EMPTY_LEDGER, parseLedger, walletOf, type Ledger } from "./ledger";
 import { bestKey, LEDGER_KEY, LEVELS, levelById } from "./levels";
@@ -64,6 +65,16 @@ function bankRun(levelId: string, time: number, coins: number): { reward: Reward
   return { reward, wallet: walletOf(ledger) };
 }
 
+/** Ends the run as a win: the best time, and the coins and speed bonus paid into this device's ledger. */
+function winPatch(levelId: string, coins: number) {
+  const time = runtime.elapsed;
+  const prev = readBest(levelId);
+  const isBest = prev === null || time < prev;
+  if (isBest) writeBest(levelId, time);
+  const { reward, wallet } = bankRun(levelId, time, coins);
+  return { phase: "won" as const, wonAt: performance.now(), result: { time, best: isBest ? time : prev, isBest, reward, wallet } };
+}
+
 type GameState = {
   phase: Phase;
   debug: boolean;
@@ -93,6 +104,8 @@ type GameState = {
   setDebug: (debug: boolean) => void;
   setPaused: (paused: boolean) => void;
   collect: (name?: string) => void;
+  /** A skateboard run ends at its finish line, whatever coins were picked up on the way. */
+  finishRun: () => void;
   restart: () => void;
   /** Plays another level: the room fogs over to white, then the page reloads on `?level=<id>` so nothing of the old level carries over. */
   goToLevel: (id: string) => void;
@@ -131,13 +144,14 @@ export const useGame = create<GameState>((set, get) => ({
     if (phase !== "playing" || totalCoins === 0) return;
     const next = collected + 1;
     const names = name ? [...collectedNames, name] : collectedNames;
-    if (next < totalCoins) return set({ collected: next, collectedNames: names });
-    const time = runtime.elapsed;
-    const prev = readBest(levelId);
-    const isBest = prev === null || time < prev;
-    if (isBest) writeBest(levelId, time);
-    const { reward, wallet } = bankRun(levelId, time, totalCoins);
-    set({ collected: next, collectedNames: names, phase: "won", wonAt: performance.now(), result: { time, best: isBest ? time : prev, isBest, reward, wallet } });
+    // A skateboard level's coins are picked up on the way (over obstacles, along rails); the run ends at the finish line (finishRun).
+    if (levelById(levelId).mode === "skate" || next < totalCoins) return set({ collected: next, collectedNames: names });
+    set({ collected: next, collectedNames: names, ...winPatch(levelId, totalCoins) });
+  },
+  finishRun: () => {
+    const { phase, levelId, collected } = get();
+    if (phase !== "playing") return;
+    set(winPatch(levelId, collected));
   },
   restart: () => {
     const { phase, sceneReady } = get();
@@ -195,6 +209,28 @@ export const runtime = {
   hueReady: false,
   /** Run time in seconds (counts only while playing and not paused). */
   elapsed: 0,
+  /** Skateboard levels: the board's state, for the camera, the board's drawing and the tests. */
+  skate: {
+    active: false,
+    /** The path he rides (skate/lane.ts), how far along it he is (m), his speed along it (m/s) and its unit direction there (the way he rolls). */
+    lane: null as Lane | null,
+    s: 0,
+    speed: 0,
+    dir: new THREE.Vector3(1, 0, 0),
+    /** The board's heading (radians, the same turn as Hue's yaw). */
+    heading: 0,
+    grinding: false,
+    railName: null as string | null,
+    /** Nose-up tilt (radians) and wheel turns, for the drawing. */
+    pitch: 0,
+    wheel: 0,
+    /** Counted for the tests: pops (ollies), grinds started, bumps into something tall. */
+    pops: 0,
+    grinds: 0,
+    bumps: 0,
+    /** The model piece the last bump was with. */
+    bumpedInto: null as string | null,
+  },
   /** Controller state for ?debug views and scripted tests. */
   debug: {
     mode: "ground" as string,
@@ -203,8 +239,10 @@ export const runtime = {
     /** (tests) How far his drawn body is moved at a spot to stand on the drawn top there (levels.ts `snapFeet`). */
     feetLift: null as null | ((x: number, y: number, z: number) => number),
     surface: null as null | { lost: number; buildMs: number; ready: boolean },
+    /** (tests, skateboard levels) Roll at this speed (m/s) at once. */
+    skateSpeed: null as null | ((v: number) => void),
     /** Scripted input in world directions (x → +X, z → +Z); overrides keys and camera yaw. */
-    input: null as null | { x: number; z: number; run: boolean; jump: boolean },
+    input: null as null | { x: number; z: number; run: boolean; jump: boolean; pop?: boolean },
   },
 };
 

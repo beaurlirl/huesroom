@@ -1,16 +1,20 @@
 import { create } from "zustand";
+import { FlickDetector } from "../skate/flick";
 import { pollGamepad } from "./gamepad";
 
-/** One merged input sample. moveZ +1 = away from the camera, moveX +1 = right on screen. */
-export type InputSample = { moveX: number; moveZ: number; run: boolean; jump: boolean };
+/** One merged input sample. moveZ +1 = away from the camera, moveX +1 = right on screen. `pop`: the right stick's flick (an ollie) completed on this sample; it matters on skateboard levels only. */
+export type InputSample = { moveX: number; moveZ: number; run: boolean; jump: boolean; pop?: boolean };
 
-/** Touch controls write here (milestone 6); keyboard is read directly. */
-export const useTouchInput = create<{ moveX: number; moveZ: number; run: boolean; jump: boolean }>(() => ({
+/** Touch controls write here (milestone 6); keyboard is read directly. `aimY` is the second (right) stick on skateboard levels, +1 = pushed up. */
+export const useTouchInput = create<{ moveX: number; moveZ: number; run: boolean; jump: boolean; aimY: number }>(() => ({
   moveX: 0,
   moveZ: 0,
   run: false,
   jump: false,
+  aimY: 0,
 }));
+
+const flick = new FlickDetector();
 
 const down = new Set<string>();
 let listening = false;
@@ -41,11 +45,15 @@ export function readInput(): InputSample {
     moveX /= len;
     moveZ /= len;
   }
+  // The right stick (a phone's second stick, or the pad's): pulled back and pushed forward again in one quick movement is a pop.
+  const aim = Math.max(-1, Math.min(1, pad.lookY - touch.aimY));
+  const pop = flick.update(aim, performance.now() / 1000);
   return {
     moveX,
     moveZ,
     run: any("ShiftLeft", "ShiftRight") || touch.run || pad.run,
     jump: down.has("Space") || touch.jump || pad.jump,
+    pop,
   };
 }
 

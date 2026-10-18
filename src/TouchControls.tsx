@@ -5,6 +5,7 @@ import { Joystick } from "react-joystick-component";
 import { useIsTouch } from "./Hud";
 import { useTouchInput } from "./input";
 import { useGame } from "./store";
+import { useLevel } from "./useLevel";
 import { theme } from "./ui/theme";
 
 const RUN_DISTANCE = 70; // % of the joystick's throw
@@ -15,6 +16,8 @@ export function TouchControls() {
   const phase = useGame((s) => s.phase);
   const paused = useGame((s) => s.paused);
   const [jumpDown, setJumpDown] = useState(false);
+  // A skateboard level swaps the jump button for a second stick: flick it back and forth to pop an ollie.
+  const skating = useLevel().mode === "skate";
 
   if (!touch) return null;
   const visible = phase === "playing" && !paused;
@@ -55,6 +58,34 @@ export function TouchControls() {
           stop={stop}
         />
       </div>
+      {skating && (
+        <div
+          className="absolute"
+          style={{
+            right: "calc(24px + env(safe-area-inset-right))",
+            bottom: "calc(28px + env(safe-area-inset-bottom))",
+            pointerEvents: visible ? "auto" : "none",
+          }}
+        >
+          <div
+            className="pointer-events-none absolute inset-0 rounded-full"
+            style={{ border: "1px solid rgba(10, 10, 10, 0.4)", background: "rgba(255, 255, 255, 0.18)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)" }}
+          />
+          <Joystick
+            size={116}
+            stickSize={52}
+            baseColor="rgba(0, 0, 0, 0)"
+            stickColor="#0a0a0a"
+            throttle={16}
+            move={(e) => useTouchInput.setState({ aimY: e.y ?? 0 })}
+            stop={() => useTouchInput.setState({ aimY: 0 })}
+          />
+          <div className="pointer-events-none absolute left-0 right-0 text-center text-xs font-bold" style={{ top: -22, color: theme.ink }}>
+            flick to ollie
+          </div>
+        </div>
+      )}
+      {!skating && (
       <button
         type="button"
         aria-label="Jump"
@@ -80,6 +111,7 @@ export function TouchControls() {
       >
         jump
       </button>
+      )}
     </div>
   );
 }

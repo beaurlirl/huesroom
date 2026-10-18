@@ -3,7 +3,7 @@
 //   Left stick   move (past 70% = run, like the phone joystick)
 //   RB / RT      hold to run
 //   A            jump · begin · Play again · resume
-//   Right stick  peek the camera
+//   Right stick  peek the camera (on a skateboard level: pull back and push forward again, in one quick flick, to ollie)
 //   D-pad / stick  walk the home menu's buttons; A presses the one in focus
 //   Menu (≡)     pause / resume
 //   View (⧉)     restart

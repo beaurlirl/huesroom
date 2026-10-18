@@ -7,9 +7,14 @@ import { playSfx } from "./audio/sfx";
 import { sampleCurve, type RootCurve, type TopOutCurve } from "./clips";
 import { BOOKS, CLIMB, CLIP_TIMES, FLAGS, HUE, LANDING, MOVE } from "./config";
 import type { InputSample } from "./input";
+import type { Mover } from "./mover";
 import { noStandBodies, pushableBodies } from "./pushables";
 import { beanbag, colliderMeta, roomColliders, type BoxCollider } from "./Room";
 import { runtime } from "./store";
+import { SkateMover } from "./skate/SkateMover";
+import type { Lane } from "./skate/lane";
+import type { Rail } from "./skate/rails";
+import { getLevel } from "./useLevel";
 
 type Rapier = ReturnType<typeof useRapier>["rapier"];
 type Mode = "ground" | "air" | "land" | "climb" | "ladder";
@@ -846,10 +851,12 @@ export function useHueController(
   rollCurve: RootCurve,
   climbRiseSpeed: number,
   topOut: TopOutCurve,
+  rails: readonly Rail[],
+  route: Lane | null,
 ) {
   const { world, rapier } = useRapier();
   const cc = useRef<KinematicCharacterController | null>(null);
-  const mover = useRef<HueMover | null>(null);
+  const mover = useRef<Mover | null>(null);
 
   // Created in the effect (not a memo) so StrictMode's mount/unmount/mount never
   // leaves us holding a freed WASM object.
@@ -875,11 +882,15 @@ export function useHueController(
       /** Lazily binds once the controller and the body/collider refs exist. */
       get() {
         if (!mover.current && cc.current && body.current && collider.current) {
-          mover.current = new HueMover(world, rapier, cc.current, body.current, collider.current, anim, rollCurve, climbRiseSpeed, topOut);
+          // A skateboard level (levels.ts mode "skate") has its own mover; every other level walks.
+          mover.current =
+            getLevel().mode === "skate"
+              ? new SkateMover(cc.current, body.current, collider.current, anim, rails, route)
+              : new HueMover(world, rapier, cc.current, body.current, collider.current, anim, rollCurve, climbRiseSpeed, topOut);
         }
         return mover.current;
       },
     }),
-    [world, rapier, body, collider, anim, rollCurve, climbRiseSpeed, topOut],
+    [world, rapier, body, collider, anim, rollCurve, climbRiseSpeed, topOut, rails, route],
   );
 }
