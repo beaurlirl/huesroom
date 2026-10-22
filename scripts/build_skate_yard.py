@@ -245,10 +245,10 @@ def obstacle(name, u0, u1, h, colour="kerb"):
     OBSTACLES.append(((u0 + u1) / 2, h, u1 - u0))
 
 
-obstacle("Kerb", 3.1, 3.6, 0.13, "kerb")
+obstacle("Kerb", 3.1, 3.6, 0.15, "kerb")
 obstacle("Barrier", 11.4, 11.8, 0.22, "barrier")
-obstacle("Double kerb a", 13.7, 14.0, 0.12, "kerb")
-obstacle("Double kerb b", 14.6, 14.9, 0.12, "kerb")
+obstacle("Double kerb a", 13.7, 14.0, 0.15, "kerb")
+obstacle("Double kerb b", 14.6, 14.9, 0.15, "kerb")
 
 # ---- the kicker: a ramp up to a lip, then air.
 RAMP_U0, RAMP_U1, RAMP_H = 5.2, 5.8, 0.30
@@ -326,7 +326,7 @@ for u, top, length in OBSTACLES:
     if 13 < u < 15:
         continue  # the double kerb gets one long arc below
     arc_coins(u, top, length)
-arc_coins(14.3, 0.12, 1.2, n=9, spacing=0.2)
+arc_coins(14.3, 0.15, 1.2, n=9, spacing=0.2)
 air_coins(RAMP_U1, RAMP_H)
 for u0, u1, top in RAILS:
     rail_coins(u0, u1, top)

@@ -2,7 +2,7 @@ import type { KinematicCharacterController } from "@dimforge/rapier3d-compat";
 import type { RapierCollider as Collider, RapierRigidBody as RigidBody } from "@react-three/rapier";
 import * as THREE from "three";
 import type { Animator } from "../animator";
-import { CLIP_TIMES, HUE, SKATE } from "../config";
+import { HUE, MOVE, SKATE } from "../config";
 import type { InputSample } from "../input";
 import type { Mover } from "../mover";
 import { colliderMeta } from "../Room";
@@ -11,11 +11,13 @@ import { Lane } from "./lane";
 import { catchRail, type Rail } from "./rails";
 
 type Mode = "ground" | "air" | "grind";
+type Flip = "kickflip" | "heelflip" | "shuvit";
 
 const CAPSULE_CENTER = HUE.capsuleHalfHeight + HUE.capsuleRadius; // feet → capsule centre
-const WHEEL_RADIUS = 0.014;
 const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
 const yawFor = (x: number, z: number) => Math.atan2(-z, x);
+/** His body's turn from the way he rolls, by stance (a yaw of +90 degrees turns +x toward -z, so a left foot forward faces the way he rolls minus a quarter turn). */
+const STANCE_TURN = { regular: -Math.PI / 2, goofy: Math.PI / 2, forward: 0 } as const;
 const _p = new THREE.Vector3();
 
 /**
@@ -28,8 +30,10 @@ const _p = new THREE.Vector3();
  */
 export class SkateMover implements Mover {
   readonly feet = new THREE.Vector3();
-  /** His drawn yaw: facing forward along the lane, his back to the camera. */
+  /** His drawn yaw: the way the board is going, turned a quarter by his stance (SKATE.stance), so he stands sideways on it. */
   yaw = 0;
+  /** The way the board is going, smoothed round the lane's bends. */
+  private heading = 0;
   mode: Mode = "ground";
   readonly debugProbe = { active: false, from: new THREE.Vector3(), to: new THREE.Vector3(), hit: false };
 
@@ -53,6 +57,11 @@ export class SkateMover implements Mover {
   /** A bump counts once per contact: it re-arms when he rolls on freely again. It takes two frames in a row of being held up, because the controller's slide now and then loses a frame's movement on flat ground. */
   private bumpArmed = true;
   private blocked = 0;
+  /** A flip trick asked for (and when), and the one in progress. */
+  private queued: { kind: Flip; at: number } | null = null;
+  private trick: { kind: Flip; t: number; dur: number } | null = null;
+  /** The stick is pushing him along (on the ground): the push clip plays; otherwise he rides. */
+  private pushing = false;
   private rail: { rail: Rail; sh: number; hLen: number; sign: 1 | -1 } | null = null;
   private skip: Rail | null = null;
   private skipUntil = 0;
@@ -67,6 +76,8 @@ export class SkateMover implements Mover {
     private route: Lane | null,
   ) {
     this.lane = route ?? Lane.straight(new THREE.Vector3(), 1, 0);
+    // A board rolls over a joint between two paving surfaces that a walker would step up.
+    this.cc.enableAutostep(SKATE.stepMax, MOVE.autostepMinWidth, false);
   }
 
   disarmJump() {
@@ -98,10 +109,12 @@ export class SkateMover implements Mover {
     this.jumpArmed = false;
     this.blocked = 0;
     this.bumpArmed = true;
+    this.trick = this.queued = null;
     this.riseVy = 0;
     this.riseAt = -Infinity;
     this.lastGroundedAt = this.now;
-    this.yaw = yawFor(this.dir.x, this.dir.z);
+    this.heading = yawFor(this.dir.x, this.dir.z);
+    this.yaw = this.heading + STANCE_TURN[SKATE.stance];
     const c = { x: this.feet.x, y: feet.y + CAPSULE_CENTER, z: this.feet.z };
     this.body.setTranslation(c, true);
     this.body.setNextKinematicTranslation(c);
@@ -110,12 +123,15 @@ export class SkateMover implements Mover {
     S.lane = this.lane;
     S.s = this.s;
     S.dir.copy(this.dir);
-    S.heading = this.yaw;
+    S.heading = this.heading;
+    S.bodyYaw = this.yaw;
     S.speed = 0;
     S.grinding = false;
     S.railName = null;
     S.pitch = 0;
-    S.pops = S.grinds = S.bumps = 0;
+    S.pops = S.grinds = S.bumps = S.tricks = S.tricksCut = 0;
+    S.roll = S.spin = S.drop = 0;
+    S.trick = null;
     this.publish();
   }
 
@@ -134,9 +150,11 @@ export class SkateMover implements Mover {
     if ((jump && !this.prevJump) || input.pop) this.popAt = this.now;
     this.prevJump = jump;
     const wantsPop = this.now - this.popAt <= SKATE.popBuffer;
+    if (input.trick) this.queued = { kind: input.trick, at: this.now };
+    const wantsTrick = !!this.queued && this.now - this.queued.at <= SKATE.popBuffer;
 
-    if (this.mode === "grind") this.updateGrind(dt, wantsPop);
-    else this.updateRoll(dt, push, wantsPop);
+    if (this.mode === "grind") this.updateGrind(dt, wantsPop, wantsTrick);
+    else this.updateRoll(dt, push, wantsPop, wantsTrick);
 
     this.dress(dt);
     this.publish();
@@ -144,7 +162,8 @@ export class SkateMover implements Mover {
 
   // ---------------------------------------------------------------- rolling and flying
 
-  private updateRoll(dt: number, push: number, wantsPop: boolean) {
+  private updateRoll(dt: number, push: number, wantsPop: boolean, wantsTrick: boolean) {
+    this.pushing = this.grounded && push > 0.1 && !this.jumped;
     // Speed: pushing and braking need the wheels on the ground; in the air it carries. Once the run is won he rolls to a stop.
     if (this.grounded) {
       if (useGame.getState().phase === "won") {
@@ -161,7 +180,12 @@ export class SkateMover implements Mover {
 
     // Pop: a hair after he left the ground, or a hair before he lands, still counts.
     const canPop = this.grounded || this.now - this.lastGroundedAt <= SKATE.coyote;
-    if (canPop && !this.jumped && wantsPop) this.pop(SKATE.ollieSpeed);
+    if (canPop && !this.jumped && (wantsPop || wantsTrick)) {
+      this.pop(SKATE.ollieSpeed);
+      if (wantsTrick) this.startTrick();
+    } else if (wantsTrick && this.mode === "air" && !this.trick) {
+      this.startTrick(); // a flip added to the jump he is already in
+    }
 
     const g = this.jumped ? SKATE.gravity : SKATE.fallGravity;
     const vyStart = this.vy;
@@ -229,7 +253,37 @@ export class SkateMover implements Mover {
     this.mode = "air";
     this.popAt = -Infinity;
     runtime.skate.pops++;
-    this.anim.play("jump", { from: CLIP_TIMES.jumpTakeoff, timeScale: CLIP_TIMES.jumpClipScale, holdAt: CLIP_TIMES.jumpAirHold, restart: true, fade: 0.08 });
+  }
+
+  private startTrick() {
+    const kind = this.queued!.kind;
+    this.queued = null;
+    this.trick = { kind, t: 0, dur: SKATE.trick[kind] };
+    runtime.skate.trick = kind;
+  }
+
+  /** Turns the board under him for a flip in progress; it finishes flat, and a landing before it is done just snaps it flat (no failing). */
+  private doTrick(dt: number) {
+    const S = runtime.skate;
+    const t = this.trick;
+    if (!t) return;
+    if (this.mode !== "air") {
+      // Landed (or caught a rail) before it finished.
+      S.tricksCut++;
+      this.trick = null;
+    } else {
+      t.t += dt;
+      const p = Math.min(1, t.t / t.dur);
+      const e = p * p * (3 - 2 * p);
+      S.roll = t.kind === "kickflip" ? 2 * Math.PI * e : t.kind === "heelflip" ? -2 * Math.PI * e : 0;
+      S.spin = t.kind === "shuvit" ? Math.PI * e : 0;
+      S.drop = SKATE.trick.drop * Math.sin(Math.PI * p);
+      if (p < 1) return;
+      S.tricks++;
+      this.trick = null;
+    }
+    S.roll = S.spin = S.drop = 0;
+    S.trick = null;
   }
 
   /** Nothing steers him off the lane: wherever the controller slid him sideways is taken back, and the lane's direction there becomes his. */
@@ -256,11 +310,10 @@ export class SkateMover implements Mover {
     const S = runtime.skate;
     S.grinds++;
     S.railName = rail.name;
-    this.anim.play("idle");
   }
 
   /** Carries him along the rail at his speed. He leaves it at its end (with a little hop, and its slope's rise) or when he pops. */
-  private updateGrind(dt: number, wantsPop: boolean) {
+  private updateGrind(dt: number, wantsPop: boolean, wantsTrick: boolean) {
     const r = this.rail!;
     this.speed = Math.max(this.speed, SKATE.rail.minSpeed);
     const step = this.speed * dt;
@@ -274,11 +327,11 @@ export class SkateMover implements Mover {
     this.lane.tangent(this.s, this.dir);
     this.lastGroundedAt = this.now;
 
-    if (wantsPop) {
+    if (wantsPop || wantsTrick) {
       this.leaveRail(SKATE.ollieSpeed);
       runtime.skate.pops++;
       this.popAt = -Infinity;
-      this.anim.play("jump", { from: CLIP_TIMES.jumpTakeoff, timeScale: CLIP_TIMES.jumpClipScale, holdAt: CLIP_TIMES.jumpAirHold, restart: true, fade: 0.08 });
+      if (wantsTrick) this.startTrick();
     } else if (r.sh >= r.hLen || r.sh <= 0) {
       const slope = (r.rail.b.y - r.rail.a.y) / r.hLen;
       this.leaveRail(SKATE.rail.exitHop + Math.max(0, r.sign * slope * this.speed));
@@ -301,22 +354,23 @@ export class SkateMover implements Mover {
   /** His pose and the board's tilt and wheels, for the drawing. */
   private dress(dt: number) {
     const S = runtime.skate;
-    this.yaw = wrap(this.yaw + wrap(yawFor(this.dir.x, this.dir.z) - this.yaw) * (1 - Math.exp(-dt / 0.1)));
+    this.heading = wrap(this.heading + wrap(yawFor(this.dir.x, this.dir.z) - this.heading) * (1 - Math.exp(-dt / 0.1)));
+    this.yaw = wrap(this.heading + STANCE_TURN[SKATE.stance]);
     S.speed = this.speed;
     S.s = this.s;
     S.dir.copy(this.dir);
-    S.heading = this.yaw;
+    S.heading = this.heading;
+    S.bodyYaw = this.yaw;
+    this.doTrick(dt);
     S.grinding = this.mode === "grind";
     let pitch = 0;
     if (this.mode === "air") pitch = THREE.MathUtils.clamp(this.vy * 0.28, -0.45, 0.45);
     else if (this.rail) pitch = Math.atan2(this.rail.rail.b.y - this.rail.rail.a.y, this.rail.hLen) * this.rail.sign;
     S.pitch += (pitch - S.pitch) * (1 - Math.exp(-dt / 0.06));
-    if (this.mode !== "grind") S.wheel += (this.speed * dt) / WHEEL_RADIUS;
-    if (this.mode === "air") {
-      if (this.anim.current !== "jump") this.anim.play("jump", { from: CLIP_TIMES.jumpAirHold - 0.1, holdAt: CLIP_TIMES.jumpAirHold, fade: 0.12 });
-    } else if (this.anim.current !== "idle") {
-      this.anim.play("idle");
-    }
+    if (this.mode !== "grind") S.wheel += (this.speed * dt) / SKATE.wheelRadius;
+    // Push to push: while the stick pushes he plays the push loop (faster the faster he goes); otherwise, and in the air and on a rail, the riding pose.
+    if (this.mode === "ground" && this.pushing) this.anim.play("skate_push", { timeScale: 1 + 0.5 * (this.speed / SKATE.maxSpeed) });
+    else if (this.anim.current !== "skate_ride") this.anim.play("skate_ride");
   }
 
   private publish() {

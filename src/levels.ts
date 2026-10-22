@@ -16,8 +16,17 @@ export type SkateDef = {
   finish: string;
   /** Node in the model whose `route` user data is the path he rides: a list of [x, y, z] points (the model's world axes, y up) in riding order. Without one the lane is straight from the spawn, the way it faces. Default "SKATE_ROUTE". */
   route?: string;
+  /**
+   * For a street that is only a street: lay obstacles, rails, kickers and coins along its route from this seed (skate/course.ts). `start` / `end`: where the first piece may be and how close
+   * to the end the last may start (m along the route; default 25 from the start and 30 before the end); `gap`: the distance between pieces, the least and how much more at most (default [9, 6]).
+   */
+  course?: { seed: number; start?: number; end?: number; gap?: [number, number] };
+  /** A second model holding only the level's `COL_*` colliders, for a level whose collision is meshes, not boxes (a street): each `COL_*` mesh becomes a mesh collider. */
+  collision?: string;
   /** Any of the SKATE.cam numbers, for a level that wants the camera nearer, higher or wider. */
   camera?: Partial<typeof SKATE.cam>;
+  /** Any of the SKATE.view numbers: how far down the street is drawn. Without it the whole model is drawn, as in every other level. */
+  view?: Partial<typeof SKATE.view>;
 };
 
 /** Per-level camera settings: any of the CAMERA numbers, plus the street-only options below. */
@@ -100,6 +109,8 @@ export type LevelDef = {
   haze?: { xMin: number; xMax: number; span: number };
   /** false = not released yet: reachable only with ?level=<id>, never offered as the next level. */
   live: boolean;
+  /** Offered only as a small "test the beta" link at the bottom of the home menu (not as a location, not as the next level, no place on the win card's list). */
+  beta?: boolean;
   /** Attribution shown (as plain text, no link) on the win screen. */
   credit?: string;
 };
@@ -254,6 +265,39 @@ export const LEVELS: readonly LevelDef[] = [
     skate: { finish: "SKATE_FINISH" },
     par: { fast: 9, slow: 40, bonusMax: 10 },
     live: false,
+  },
+  {
+    // The two skateboard streets, ridden from behind along their route. Offered as the beta at the bottom of the home menu.
+    id: "ludlow-skate",
+    number: 5,
+    name: "ludlow skate",
+    mode: "skate",
+    room: assetV("/levels/ludlow-skate/room.glb"),
+    spawn: "SPAWN_Skate",
+    start: "stand",
+    winLine: "hue rolled down the block",
+    lighting: "street",
+    skate: { finish: "FINISH_Skate", collision: assetV("/levels/ludlow-skate/collision.glb"), course: { seed: 11 }, view: {} },
+    par: { fast: 150, slow: 420, bonusMax: 40 },
+    credit: "street layout from map data © OpenStreetMap contributors",
+    live: false,
+    beta: true,
+  },
+  {
+    id: "broome-skate",
+    number: 6,
+    name: "broome skate",
+    mode: "skate",
+    room: assetV("/levels/broome-skate/room.glb"),
+    spawn: "SPAWN_Skate",
+    start: "stand",
+    winLine: "hue rolled down the block",
+    lighting: "street",
+    skate: { finish: "FINISH_Skate", collision: assetV("/levels/broome-skate/collision.glb"), course: { seed: 23, start: 18, end: 85 }, view: {} },
+    par: { fast: 60, slow: 180, bonusMax: 20 },
+    credit: "street layout from map data © OpenStreetMap contributors",
+    live: false,
+    beta: true,
   },
 ];
 

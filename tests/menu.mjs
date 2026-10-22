@@ -72,6 +72,22 @@ for (const [name, heading] of [['privacy', 'Privacy'], ['support', 'Support'], [
   await page.getByRole('link', { name: 'privacy' }).waitFor({ timeout: 60000 });
 }
 
+// 3b. The unreleased skate streets are offered only by a small "test the beta" link at the bottom: closed until pressed, then one button per street, and each one loads its level.
+const betaLink = page.getByRole('button', { name: /test the beta/i });
+check('a "test the beta" link sits at the bottom of the menu', (await betaLink.count()) === 1);
+check('and it is the last thing in the menu\'s tab order', await page.evaluate(() => { const it = [...document.querySelectorAll('[data-menu] button, [data-menu] a[href]')]; return (it[it.length - 1]?.textContent ?? '').toLowerCase().includes('test the beta'); }));
+check('the skate streets are not listed until it is opened', (await page.getByRole('button', { name: /ludlow skate|broome skate/i }).count()) === 0);
+await betaLink.click();
+check('opening it lists both skate streets', (await page.getByRole('button', { name: 'ludlow skate' }).count()) === 1 && (await page.getByRole('button', { name: 'broome skate' }).count()) === 1);
+check('the three locations are still the only ones listed above it', ((await page.locator('body').innerText()).toLowerCase().match(/not played/g) ?? []).length === 3);
+await page.getByRole('button', { name: 'ludlow skate' }).click();
+await page.waitForURL(/[?&]level=ludlow-skate(&|$)/, { timeout: 20000 }).then(
+  () => check('a skate street loads its own level (?level=ludlow-skate)', true),
+  (e) => check('a skate street loads its own level (?level=ludlow-skate)', false, e.message.split('\n')[0]),
+);
+await page.goto(BASE + '/');
+await page.getByRole('link', { name: 'privacy' }).waitFor({ timeout: 90000 });
+
 // 4. Play loads the first location (a fresh page, ?level=home); a key then begins the run.
 await page.getByRole('button', { name: 'play' }).first().click();
 await beginLevel('home').then(

@@ -21,6 +21,8 @@ export const ASSETS = {
   hue: assetV("/hue/hue.glb"),
   draco: asset("/draco/"),
   anim: (name: ClipName) => assetV(`/hue/anim/${name}.glb`),
+  /** The skateboard (scripts/prepare_skate_board.py): one body mesh and four wheels, WHEEL_1 to WHEEL_4. */
+  board: assetV("/hue/board.glb"),
 };
 
 export const FX_TEXTURES = [
@@ -43,6 +45,8 @@ export const CLIP_NAMES = [
   "climb_top",
   "sit",
   "sit_to_stand",
+  "skate_push",
+  "skate_ride",
 ] as const;
 export type ClipName = (typeof CLIP_NAMES)[number];
 
@@ -110,6 +114,8 @@ export const SKATE = {
   /** Pop a hair after leaving the ground, or a hair before landing, and it still counts (s). */
   coyote: 0.09,
   popBuffer: 0.12,
+  /** He rolls up a step this high without a pop (a joint between two paving surfaces, a kerb cut): anything taller is an obstacle. The walking controller's is 0.10. */
+  stepMax: 0.12,
   /** Running into something tall: he keeps this much of his speed (a bump, not a crash). */
   bumpKeep: 0.12,
   /** Leaving a ramp's lip keeps its upward speed, up to this (m/s). */
@@ -122,8 +128,25 @@ export const SKATE = {
    * (s) it keeps up along the lane, `rise` how closely it follows the ground's height (a jump does not lift it past `deadzone`).
    */
   cam: { dist: 1.5, distFast: 0.5, height: 0.72, lookAhead: 3.0, lookHeight: 0.12, fov: 58, fovFast: 9, follow: 0.09, rise: 0.15, deadzone: 0.1 },
-  /** The board's top above the ground (m): his drawn feet stand on it. */
-  deck: 0.036,
+  /**
+   * How far down the street a skateboard level is drawn (skate/SkateView.tsx): `ahead` metres in front of him and `behind` behind. Past `fogFrom` (a fraction of `ahead`) the street fades into a
+   * haze of this colour (the sky's horizon), so the far end is never a cut edge; whole chunks of the model outside the window are not drawn at all. A level can set its own.
+   */
+  view: { ahead: 75, behind: 15, fogFrom: 0.35, fog: "#dfe7ec" },
+  /**
+   * How his body is turned from the way he rolls: "regular" (left foot forward: his chest faces the right-hand side of the way he rolls), "goofy" (the other way) or "forward" (no extra turn).
+   * The skateboarding clips (skate_push, skate_ride) already stand him sideways on the board, so with them it is "forward"; "regular" and "goofy" are for turning a square-on pose.
+   */
+  stance: "forward" as "regular" | "goofy" | "forward",
+  /**
+   * How far his drawn body is raised (m) so his soles rest on the deck. The deck's top is 0.022 m above the ground (DECK_TOP, printed by scripts/prepare_skate_board.py), but the skating clips hold
+   * his soles 0.011 m above the root, so the lift is the difference (measured with tests/dev/sole-height.mjs: in skate_ride the soles were 0.010 to 0.012 m over the deck at 0.022).
+   */
+  deck: 0.011,
+  /** Flip tricks (the board turns under him while he is in the air; it finishes flat, and landing early just snaps it flat: there is no failing): seconds each takes, and how far the board drops from his feet while it turns (m). */
+  trick: { kickflip: 0.52, heelflip: 0.52, shuvit: 0.46, drop: 0.035 },
+  /** The wheels' radius (m), for how fast they turn. */
+  wheelRadius: 0.0062,
 };
 
 export const FLAGS = {

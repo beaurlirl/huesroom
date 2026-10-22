@@ -3,6 +3,8 @@ import * as THREE from 'three';
 import { FlickDetector, FLICK } from '../src/skate/flick.ts';
 import { railFromBox, catchRail, railPoint } from '../src/skate/rails.ts';
 import { Lane } from '../src/skate/lane.ts';
+import { generateCourse } from '../src/skate/course.ts';
+import { SKATE } from '../src/config.ts';
 
 let fails = 0;
 const check = (name, ok, info = '') => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${name} ${info}`); if (!ok) fails++; };
@@ -26,6 +28,13 @@ const twice = play([[0, 0.9], [0.1, -0.6], [0.2, -0.9], [0.4, 0.6], [0.45, 0.8]]
 check('flicking back and forth again pops again, once the cooldown is over', twice.length === 2 && twice[1] - twice[0] >= FLICK.cooldown, JSON.stringify(twice));
 const quick = play([[0, 0.9], [0.05, -0.6], [0.08, -0.9], [0.1, 0.6]]);
 check('two flicks inside the cooldown pop once', quick.length === 1, JSON.stringify(quick));
+
+// the flick's lean picks the trick
+function play2(samples) { const d = new FlickDetector(); let last = false; for (const [t, v, x] of samples) { const r = d.update(v, t, x ?? 0); if (r) last = r; } return last; }
+check('a flick that leans left is a kickflip', play2([[0, 0.9, 0], [0.1, 0.5, -0.3], [0.2, -0.2, -0.7], [0.26, -0.6, -0.6]]) === 'kickflip');
+check('a flick that leans right is a heelflip', play2([[0, 0.9, 0], [0.1, 0.5, 0.3], [0.2, -0.2, 0.7], [0.26, -0.6, 0.6]]) === 'heelflip');
+check('a straight flick is still the ollie', play2([[0, 0.9, 0], [0.1, 0.1, 0.1], [0.2, -0.6, -0.1]]) === 'ollie');
+check('a lean while the stick is still pulled back does not count', play2([[0, 0.9, -0.9], [0.1, 0.9, -0.9], [0.15, 0.2, 0], [0.25, -0.6, 0]]) === 'ollie');
 
 // --- the rails -----------------------------------------------------------------------------------------------------------------
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -75,6 +84,29 @@ check('projection finds the right leg of a bend near its hint', Math.abs(bend.pr
 const hairpin = new Lane([V(0, 0, 0), V(20, 0, 0), V(20, 0, 1), V(0, 0, 1)]);
 check('projection with a hint stays on its own stretch of a street that doubles back', Math.abs(hairpin.project(5, 0.6, 5, 6) - 5) < 1e-6 && Math.abs(hairpin.project(5, 0.6, 36, 6) - 36) < 1e-6);
 try { new Lane([V(0, 0, 0), V(0, 5, 0)]); check('a lane with no horizontal length is refused', false); } catch { check('a lane with no horizontal length is refused', true); }
+
+// --- the generated course (a street with no gameplay of its own)
+const road = new Lane([V(0, 0, 0), V(0, 0.4, 150), V(12, 0.9, 300)]); // a long street that bends and climbs
+const opts = { seed: 11, start: 25, end: 270, gap: [9, 6] };
+const course = generateCourse(road, opts);
+const again = generateCourse(road, opts);
+check('a course has pieces, rails and coins', course.pieces.length >= 10 && course.rails.length >= 2 && course.coins.length > 60, `${course.pieces.length} pieces, ${course.rails.length} rails, ${course.coins.length} coins`);
+check('the same seed makes the same course', JSON.stringify(course.pieces.map((p) => [p.kind, +p.s.toFixed(4)])) === JSON.stringify(again.pieces.map((p) => [p.kind, +p.s.toFixed(4)])) && course.coins.every((c, i) => c.distanceTo(again.coins[i]) < 1e-9));
+check('another seed makes another course', generateCourse(road, { ...opts, seed: 12 }).pieces.map((p) => p.kind).join() !== course.pieces.map((p) => p.kind).join());
+check('every piece is inside the stretch asked for', course.pieces.every((p) => p.s >= opts.start - 1e-9 && p.s < opts.end), `${course.pieces[0].s.toFixed(1)} to ${course.pieces.at(-1).s.toFixed(1)}`);
+const gaps = course.pieces.slice(1).map((p, i) => p.s - course.pieces[i].sEnd);
+check('pieces are far enough apart to land and line up the next', Math.min(...gaps) >= opts.gap[0] - 1e-9, `closest ${Math.min(...gaps).toFixed(1)} m`);
+check('no kind of piece twice in a row', course.pieces.every((p, i) => i === 0 || p.kind !== course.pieces[i - 1].kind));
+const block = course.pieces.filter((p) => p.kind === 'kerb' || p.kind === 'barrier' || p.kind === 'doubleKerb');
+check('obstacles are taller than he rolls over and short enough to clear', block.length > 2 && block.every((p) => p.boxes.every((b) => b.size.y >= SKATE.stepMax + 0.02 && b.size.y <= 0.23)), block.map((p) => p.boxes[0].size.y.toFixed(2)).join(' '));
+const groundAt = (p) => road.at(road.project(p.x, p.z, 0, Infinity)).y;
+const needJump = course.pieces.filter((p) => p.kind !== 'trail' && p.kind !== 'kicker');
+check('the coins over obstacles and rails are out of reach from the ground', needJump.length > 5 && needJump.every((p) => p.coins.every((c) => c.y - groundAt(c) >= 0.58 - 1e-9)));
+const railPieces = course.pieces.filter((p) => p.kind === 'rail');
+check('rails are 1.2 to 2.2 m long and 0.20 to 0.26 m up, with a ledge a hair under the line that he bumps into', railPieces.length >= 2 && railPieces.every((p) => { const r = p.rails[0]; const ledge = p.boxes.find((b) => b.name.endsWith('ledge')); return r.length >= 1.2 && r.length <= 2.2 && r.a.y - groundAt(r.a) >= 0.2 - 1e-9 && r.a.y - groundAt(r.a) <= 0.26 + 1e-9 && ledge.collide && !ledge.render && Math.abs((ledge.pos.y + ledge.size.y / 2) - (r.a.y + r.b.y) / 2 + 0.03) < 0.02; }));
+const kick = course.pieces.find((p) => p.kind === 'kicker');
+check('a kicker is a ramp whose surface rises 0.3 m over 0.6 m, with coins in the air after it', !!kick && kick.coins.length === 5 && kick.boxes[0].collide && Math.abs(kick.boxes[0].size.x - Math.hypot(0.6, 0.3)) < 1e-6);
+check('every course coin has a distinct place', new Set(course.coins.map((c) => c.toArray().map((v) => v.toFixed(3)).join())).size === course.coins.length);
 
 console.log(fails ? `\n${fails} FAILED` : '\nall passed');
 process.exit(fails ? 1 : 0);

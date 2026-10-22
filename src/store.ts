@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { create } from "zustand";
 import type { Reward } from "./economy";
+import type { Course } from "./skate/course";
 import type { Lane } from "./skate/lane";
 import { OUTRO } from "./config";
 import { applyRun, EMPTY_LEDGER, parseLedger, walletOf, type Ledger } from "./ledger";
@@ -214,15 +215,25 @@ export const runtime = {
     active: false,
     /** The path he rides (skate/lane.ts), how far along it he is (m), his speed along it (m/s) and its unit direction there (the way he rolls). */
     lane: null as Lane | null,
+    /** The level's generated course, if it has one (for the tests). */
+    course: null as Course | null,
     s: 0,
     speed: 0,
     dir: new THREE.Vector3(1, 0, 0),
-    /** The board's heading (radians, the same turn as Hue's yaw). */
+    /** The board's heading (radians, the same turn as Hue's yaw), and the way his body faces on it (a quarter turn off, by his stance). */
     heading: 0,
+    bodyYaw: 0,
     grinding: false,
     railName: null as string | null,
     /** Nose-up tilt (radians) and wheel turns, for the drawing. */
     pitch: 0,
+    /** A flip trick in progress: the board's roll about its length and spin about its middle (radians) and how far it has dropped from his feet (m); the trick's name; tricks finished in the air and cut short by landing. */
+    roll: 0,
+    spin: 0,
+    drop: 0,
+    trick: null as string | null,
+    tricks: 0,
+    tricksCut: 0,
     wheel: 0,
     /** Counted for the tests: pops (ollies), grinds started, bumps into something tall. */
     pops: 0,
@@ -242,7 +253,7 @@ export const runtime = {
     /** (tests, skateboard levels) Roll at this speed (m/s) at once. */
     skateSpeed: null as null | ((v: number) => void),
     /** Scripted input in world directions (x → +X, z → +Z); overrides keys and camera yaw. */
-    input: null as null | { x: number; z: number; run: boolean; jump: boolean; pop?: boolean },
+    input: null as null | { x: number; z: number; run: boolean; jump: boolean; pop?: boolean; trick?: "kickflip" | "heelflip" | "shuvit" },
   },
 };
 

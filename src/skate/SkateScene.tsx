@@ -1,69 +1,52 @@
 "use client";
 
+import { useGLTF } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
-import { MOVE } from "../config";
+import { ASSETS, MOVE } from "../config";
 import { blenderName } from "../Room";
 import { runtime, useGame } from "../store";
 import { useLevel, useRoom } from "../useLevel";
 import type { Lane } from "./lane";
 
-const WHEEL_R = 0.014;
-const DECK = new THREE.MeshStandardMaterial({ color: "#d1a06a", roughness: 0.55 });
-const GRIP = new THREE.MeshStandardMaterial({ color: "#1b1b1d", roughness: 0.95 });
-const TRUCK = new THREE.MeshStandardMaterial({ color: "#a9adb3", roughness: 0.35, metalness: 0.8 });
-const WHEEL = new THREE.MeshStandardMaterial({ color: "#f3efe6", roughness: 0.45 });
-
-/** Hue's board, drawn from the skateboard mover's state: it sits under his feet, points along the lane, tilts with a pop or a sloped rail and turns its wheels with his speed. */
+/** Hue's board (the model from scripts/prepare_skate_board.py), drawn from the skateboard mover's state: it sits under his feet, points along the lane, tilts with a pop or a sloped rail and turns its four wheels with his speed. */
 export function SkateBoard() {
+  const gltf = useGLTF(ASSETS.board, ASSETS.draco);
   const root = useRef<THREE.Group>(null);
   const tilt = useRef<THREE.Group>(null);
-  const wheels = useRef<THREE.Group[]>([]);
-
-  const geo = useMemo(
-    () => ({
-      deck: new THREE.BoxGeometry(0.17, 0.008, 0.09),
-      kick: new THREE.BoxGeometry(0.04, 0.008, 0.09),
-      grip: new THREE.BoxGeometry(0.17, 0.001, 0.088),
-      truck: new THREE.BoxGeometry(0.012, 0.008, 0.07),
-      wheel: new THREE.CylinderGeometry(WHEEL_R, WHEEL_R, 0.014, 14).rotateX(Math.PI / 2),
-    }),
-    [],
-  );
-  useLayoutEffect(() => () => Object.values(geo).forEach((g) => g.dispose()), [geo]);
+  // Its own copy, so a restart or a second mount never shares a parent with the first.
+  const board = useMemo(() => gltf.scene.clone(true), [gltf.scene]);
+  const wheels = useMemo(() => [1, 2, 3, 4].map((i) => board.getObjectByName(`WHEEL_${i}`)).filter((w): w is THREE.Object3D => !!w), [board]);
+  useLayoutEffect(() => {
+    board.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (mesh.isMesh) {
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+      }
+    });
+  }, [board]);
 
   useFrame(() => {
     const S = runtime.skate;
     const g = root.current;
     if (!g || !S.active) return;
     g.position.set(runtime.feet.x, runtime.feet.y - MOVE.offset, runtime.feet.z);
-    g.rotation.set(0, S.heading, 0);
-    if (tilt.current) tilt.current.rotation.z = S.pitch;
-    for (const w of wheels.current) if (w) w.rotation.z = -S.wheel;
+    g.rotation.set(0, S.heading + S.spin, 0);
+    if (tilt.current) {
+      // A flip rolls the board about its own length, then the pitch tips it; the board drops from his feet while it turns.
+      tilt.current.rotation.order = "ZYX";
+      tilt.current.rotation.set(S.roll, 0, S.pitch);
+      tilt.current.position.y = -S.drop;
+    }
+    for (const w of wheels) w.rotation.z = -S.wheel;
   });
 
-  const y = WHEEL_R + 0.008 + 0.004; // deck centre: wheel, truck, half the deck
   return (
     <group ref={root}>
-      <group ref={tilt} position={[0, 0, 0]}>
-        <mesh geometry={geo.deck} material={DECK} position={[0, y, 0]} castShadow />
-        <mesh geometry={geo.grip} material={GRIP} position={[0, y + 0.0045, 0]} />
-        {[-1, 1].map((k) => (
-          <mesh key={`kick${k}`} geometry={geo.kick} material={DECK} position={[k * 0.1, y + 0.006, 0]} rotation={[0, 0, k * 0.4]} castShadow />
-        ))}
-        {[-1, 1].map((k) => (
-          <mesh key={`truck${k}`} geometry={geo.truck} material={TRUCK} position={[k * 0.06, y - 0.0075, 0]} />
-        ))}
-        {[-1, 1].flatMap((kx) =>
-          [-1, 1].map((kz) => (
-            <group key={`wheel${kx}${kz}`} position={[kx * 0.06, WHEEL_R, kz * 0.037]} ref={(el) => {
-              if (el) wheels.current[kx + 1 + (kz + 1) / 2] = el;
-            }}>
-              <mesh geometry={geo.wheel} material={WHEEL} castShadow />
-            </group>
-          )),
-        )}
+      <group ref={tilt}>
+        <primitive object={board} />
       </group>
     </group>
   );

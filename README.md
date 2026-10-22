@@ -64,16 +64,19 @@ with his back to us, looking down the road, and he only ever goes forward. The l
 level without one, a straight line from the spawn node in the direction it faces (`facing_xy`). Nothing steers him sideways, so everything he meets (obstacles, rails, coins, the finish) sits on
 the lane. The level ends at a finish line, not at the last coin: its coins are picked up on the way and whatever he collected is banked.
 
-**Controls.** Left stick (W / S, the arrows): up pushes (it speeds him up, to 2.7 m/s), down brakes; sideways does nothing. Ollie: flick the right stick (pull it back and push it forward again in one quick
-movement, within about 0.45 s; the other way round works too), or Space, or the pad's A. On a phone the jump button is replaced by a second stick. On a rail he rides to the end by
-himself; an ollie takes him off early. Running into something tall costs him most of his speed and nothing else (there is no failing).
+**Controls.** Left hand, the left stick or **W / S**: up pushes (it speeds him up, to 2.7 m/s), down brakes; sideways does nothing. Right hand, the right stick or **the arrow keys**: the tricks.
+Keyboard: **Up** ollie, **Left** kickflip, **Right** heelflip, **Down** shuvit (Space is also an ollie). On the ground an arrow pops and does the trick in one; tapped in the air it adds the trick to the
+ollie he is in. A kickflip or heelflip rolls the board once along its length under him (the other way for the heelflip), a shuvit spins it half a turn, and it finishes flat. Landing before it is done
+just snaps it flat: nothing is lost. Phone and pad: flick the right stick back and forward again in one quick movement (within about 0.45 s) for an ollie, leaning it left on the way for a kickflip or
+right for a heelflip; on a pad X is a kickflip, B a heelflip, Y a shuvit, and A pops. On a rail he rides to the end by himself; any pop or trick takes him off early. Running into something tall costs
+him most of his speed and nothing else (there is no failing).
 
 `levels.ts` gives the level `skate: { finish: "<node>", route?: "<node>", camera?: {...} }`; the code is in `src/skate/` (`SkateMover.ts` the rider, `lane.ts` the path, `SkateCamera.tsx`,
 `rails.ts`, `flick.ts`, `SkateScene.tsx` the board and the finish) and every number is in `SKATE` in `src/config.ts` (`SKATE.cam` for the camera).
 
 | Node | | What it does |
 |---|---|---|
-| `COL_*` boxes | required | As in any level. Obstacles are ordinary colliders; a rail's supports too. (Only boxes so far: no mesh colliders) |
+| `COL_*` boxes | required | As in any level. Obstacles are ordinary colliders; a rail's supports too. A street whose collision is meshes (`skate.collision`: a second glb of `COL_*` meshes) gets mesh colliders |
 | `SKATE_ROUTE` | optional | An empty whose `route` user data is a list of `[x, y, z]` points (the model's world axes, y up) in riding order: the path he rides and the camera follows. Points a metre or two apart are plenty; the spawn must be on it. Without it the lane is straight from the spawn |
 | `RAIL_01`, `RAIL_02`, … | optional | A hidden box per rail: its **long side is the rail** and its **top face is the line he grinds along** (it may slope). It has no collider of its own: the visible rail is ordinary geometry, and under it a `COL_*` ledge or its supports must stop a board that rolls into it (top about 3 cm under the grind line) |
 | `COIN_nn` | required | As in any level. Over an obstacle, in an arc; above a rail, in a line (numbers below). The coin disc faces down the lane |
@@ -89,6 +92,19 @@ Rail lines work from **0.18 to 0.30 m** up (the board is caught from 6 cm under 
 or a grind is centred **0.58 m or more** above the ground (or above the rail line he is on). Over an obstacle: an arc at least as long as the obstacle plus 0.3 m, 0.58 m up at the
 ends and about 0.16 m higher in the middle. Above a rail: a line of coins 0.47 m over the grind line, one every 0.25 m. After a kicker: along the flight, 0.38 m over his feet.
 `scripts/build_skate_yard.py` has these as `arc_coins`, `rail_coins` and `air_coins`.
+
+**A street with no gameplay of its own** (a model that is only the street, with a route) gets it laid along the route from a seed (`skate.course: { seed }`, `src/skate/course.ts`): kerbs and barriers
+(0.15 to 0.22 m), double kerbs, grind rails on a ledge (1.2 to 2.2 m long, 0.20 to 0.26 m up), kickers, and the coins over every one of them by the rules above, 9 to 15 m apart, never the
+same kind twice in a row, the same on every device. The pieces are drawn as plain boxes and the coins are added as `COIN_nnn` nodes, so nothing else in the game needs to know. `tests/skate-maps.mjs`
+rides both street levels with a scripted rider and checks every rail is ground and every coin picked up.
+
+**Draw distance.** A long street is drawn only near him (`skate.view`, defaults in `SKATE.view`: 75 m ahead, 15 m behind): the camera's far plane stops there, the last stretch fades into haze of the
+horizon's colour, and the model's chunks (a street model comes in blocks of buildings) outside the window are switched off, placed once by the stretch of the route their box covers. `node tests/dev/perf-skate.mjs <level>` counts a phone
+frame (Ludlow, 380 m: about 190 draw calls and 155K to 185K triangles; Broome: about 175 calls and 190K to 205K). To use a street model, `scripts/prepare_skate_level.py` adds its route to the glb (the geometry is not touched).
+
+**Hue on the board.** The board is a model (`public/hue/board.glb`, 3K triangles: a deck, trucks and four wheels that turn with his speed), made from a detailed skateboard model by
+`scripts/prepare_skate_board.py` (Blender's command line; it also prints how high the deck is above the ground, which is `SKATE.deck`). He rides in two Mixamo clips, `skate_push` (while the stick
+pushes) and `skate_ride` (otherwise, and in the air and on rails); `scripts/convert-mixamo-clip.mjs` turns a Mixamo FBX into a clip glb in the format the others have.
 
 **The test yard.** `?level=skate-yard` (not offered to players: `live: false`) is a straight lane with a kerb, a barrier, a double kerb, a kicker and two rails, 37 coins and a finish,
 built by `python3 scripts/build_skate_yard.py` with no Blender. It exists to build and test the skate gameplay before any real level model, and is the worked example of the table above.

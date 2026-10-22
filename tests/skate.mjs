@@ -91,6 +91,16 @@ const cam = await S(() => {
 check('the camera is behind him on the lane and he is dead centre in the picture', cam.every((c) => Math.abs(c.ndcX) < 0.01 && c.back < -1.0 && Math.abs(c.camX) < 0.01), JSON.stringify(cam));
 check('the camera pulls back as he speeds up, and looks down the lane (the controls turn with it)', cam[1].back < cam[0].back - 0.05 && cam.every((c) => Math.abs(c.yaw) < 0.05), `distance ${(-cam[0].back).toFixed(2)} -> ${(-cam[1].back).toFixed(2)} m`);
 
+// ---- his body turn follows the board's heading (SKATE.stance)
+await S(() => window.__sk.reset(2.0, 1.5));
+const stance = await S(() => {
+  const R = window.__sk.R;
+  window.__sk.drive(30);
+  const turn = (a) => { let d = a; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return d; };
+  return { rolling: turn(R.skate.bodyYaw - R.skate.heading) };
+});
+check('his body follows the way the board is going (the skateboarding clips stand him sideways on it themselves)', Math.abs(stance.rolling) < 0.02, `${(stance.rolling * 180 / Math.PI).toFixed(0)} degrees from the board's heading`);
+
 // ---- the ollie: same height at any frame rate, and one pop is one jump
 const apex = await S(() => {
   const out = {};
@@ -133,6 +143,64 @@ const stick = await S(() => {
 check('pulling the right stick back and pushing it forward pops once', stick.flick === 1, `pops ${stick.flick}`);
 check('a stick pulled back and let spring home does not pop', stick.spring === 0, `pops ${stick.spring}`);
 check('a slow back-and-forth does not pop', stick.slow === 0, `pops ${stick.slow}`);
+
+// ---- tricks on the keyboard: W pushes and S brakes, the arrows are the right hand's tricks (up ollie, left kickflip, right heelflip, down shuvit)
+const key = (down, code) => page.keyboard[down ? 'down' : 'up'](code);
+const frames = (n) => page.evaluate((n) => { window.__sk.R.debug.input = null; for (let i = 0; i < n; i++) window.__vt.frame(1 / 60); }, n);
+const board = () => S(() => { const k = window.__sk.R.skate; return { roll: k.roll, spin: k.spin, drop: k.drop, trick: k.trick, tricks: k.tricks, cut: k.tricksCut, pops: k.pops, mode: window.__sk.R.debug.mode, speed: k.speed, y: window.__sk.R.feet.y }; });
+const reset = (x, v) => S(([x, v]) => { window.__sk.reset(x, v); }, [x, v]);
+await reset(-1.3, 0);
+await frames(3);
+await key(true, 'ArrowUp'); await frames(2); await key(false, 'ArrowUp'); await frames(40);
+const arrowPush = await board();
+check('the arrow keys do not push on a skateboard level (W does)', arrowPush.speed < 0.01 && arrowPush.pops === 1, `speed ${arrowPush.speed.toFixed(2)} after tapping the up arrow (it popped an ollie instead, ${arrowPush.pops} pop)`);
+await reset(-1.3, 0);
+await frames(3);
+await key(true, 'KeyW'); await frames(60); await key(false, 'KeyW');
+check('W pushes him from a standstill', (await board()).speed > 0.9);
+
+async function tryTrick(code, expect) {
+  await reset(-6.0, 2.0);
+  await frames(5);
+  await key(true, code); await frames(1); await key(false, code);
+  let maxRoll = 0, minRoll = 0, maxSpin = 0, maxDrop = 0, seen = null;
+  for (let i = 0; i < 70; i++) { await frames(1); const b = await board(); maxRoll = Math.max(maxRoll, b.roll); minRoll = Math.min(minRoll, b.roll); maxSpin = Math.max(maxSpin, b.spin); maxDrop = Math.max(maxDrop, b.drop); seen ??= b.trick; }
+  const end = await board();
+  return { ...end, maxRoll, minRoll, maxSpin, maxDrop, seen };
+}
+const kflip = await tryTrick('ArrowLeft');
+check('the left arrow pops a kickflip: one full roll of the board along its length, finishing flat', kflip.pops === 1 && kflip.seen === 'kickflip' && kflip.maxRoll > 6.2 && kflip.tricks === 1 && kflip.roll === 0 && kflip.maxDrop > 0.03, `peak roll ${(kflip.maxRoll * 180 / Math.PI).toFixed(0)} degrees, dropped ${kflip.maxDrop.toFixed(3)} m from his feet, ends at ${kflip.roll}`);
+const heel = await tryTrick('ArrowRight');
+check('the right arrow pops a heelflip: the roll the other way', heel.pops === 1 && heel.seen === 'heelflip' && heel.minRoll < -6.2 && heel.tricks === 1 && heel.roll === 0, `${(heel.minRoll * 180 / Math.PI).toFixed(0)} degrees`);
+const shuv = await tryTrick('ArrowDown');
+check('the down arrow pops a shuvit: the board spins half a turn under him, flat', shuv.pops === 1 && shuv.seen === 'shuvit' && shuv.maxSpin > 3.0 && shuv.maxRoll < 0.01 && shuv.tricks === 1 && shuv.spin === 0, `${(shuv.maxSpin * 180 / Math.PI).toFixed(0)} degrees`);
+const oll = await tryTrick('ArrowUp');
+check('the up arrow is the plain ollie: no flip', oll.pops === 1 && oll.seen === null && oll.maxRoll === 0 && oll.tricks === 0);
+// a flip added in the air, and one cut short by landing
+await reset(-6.0, 2.0);
+await frames(5);
+await key(true, 'ArrowUp'); await frames(1); await key(false, 'ArrowUp'); await frames(7);
+await key(true, 'ArrowLeft'); await frames(1); await key(false, 'ArrowLeft'); await frames(60);
+const airFlip = await board();
+check('a flip tapped in the air adds to the ollie he is in', airFlip.pops === 1 && airFlip.tricks === 1 && airFlip.roll === 0, `${airFlip.tricks} trick, ${airFlip.cut} cut`);
+await reset(-6.0, 2.0);
+await frames(5);
+await key(true, 'Space'); await frames(1); await key(false, 'Space'); await frames(33);
+await key(true, 'ArrowLeft'); await frames(1); await key(false, 'ArrowLeft'); await frames(60);
+const late = await board();
+check('a flip started too late to finish is snapped flat on landing, with nothing lost', late.cut === 1 && late.tricks === 0 && late.roll === 0 && late.spin === 0 && late.drop === 0 && late.speed > 1.5, `pops ${late.pops}, tricks ${late.tricks}, cut ${late.cut}, roll ${late.roll}, speed ${late.speed.toFixed(2)}`);
+// the right stick on a phone or pad: down, then up with a lean left
+await reset(-6.0, 2.0);
+await frames(5);
+const flipStick = await S(() => {
+  const touch = window.__hue.touch, k = window.__sk.R.skate, step = (n, st) => { for (let i = 0; i < n; i++) { touch.setState(st); window.__vt.frame(1 / 60); } };
+  window.__sk.R.debug.input = null;
+  step(4, { aimX: 0, aimY: -1 }); step(3, { aimX: -0.9, aimY: 0.2 }); step(4, { aimX: -0.9, aimY: 1 }); touch.setState({ aimX: 0, aimY: 0 });
+  const seen = k.trick; for (let i = 0; i < 60; i++) window.__vt.frame(1 / 60);
+  return { seen, tricks: k.tricks, pops: k.pops };
+});
+check('the right stick pulled back and flicked up leaning left is a kickflip', flipStick.seen === 'kickflip' && flipStick.tricks === 1 && flipStick.pops === 1, JSON.stringify(flipStick));
+await S(() => { window.__sk.R.debug.input = { x: 0, z: 0, run: false, jump: false }; });
 
 // ---- running into the kerb (3.1 to 3.6, 0.13 high) without jumping is a bump: he loses most of his speed, once, and stays behind it
 const bump = await S(() => {

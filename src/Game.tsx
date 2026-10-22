@@ -35,6 +35,9 @@ import { TouchControls } from "./TouchControls";
 import { runtime, useGame } from "./store";
 import { getLevel, useLevel, useRoom } from "./useLevel";
 import { SkateCamera } from "./skate/SkateCamera";
+import { SkateCollision } from "./skate/SkateCollision";
+import { SkateCourse } from "./skate/SkateCourse";
+import { SkateView } from "./skate/SkateView";
 import { SkateBoard, SkateFinish } from "./skate/SkateScene";
 import { Overlay } from "./ui/Overlay";
 import { theme } from "./ui/theme";
@@ -130,7 +133,8 @@ export default function Game() {
   const setDebug = useGame((s) => s.setDebug);
   const paused = useGame((s) => s.paused);
   const phase = useGame((s) => s.phase);
-  const skating = useLevel().mode === "skate";
+  const level = useLevel();
+  const skating = level.mode === "skate";
   useHotkeys();
   const coarse = useIsTouch();
   // Adaptive resolution: start at the cap (1.5 on phones, 2 on desktop) and step down if the
@@ -215,6 +219,9 @@ export default function Game() {
               <Room />
               <Ceiling />
               <Hue />
+              {skating && level.skate?.collision && <SkateCollision />}
+              {skating && level.skate?.course && <SkateCourse />}
+              {skating && level.skate?.view && <SkateView />}
               {skating && <SkateBoard />}
               {skating && <SkateFinish />}
               <Coins />

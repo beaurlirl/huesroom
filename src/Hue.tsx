@@ -15,10 +15,11 @@ import { theme } from "./ui/theme";
 import { useLevel, useRoom } from "./useLevel";
 import { blenderName, roomColliders } from "./Room";
 import { SurfaceMap } from "./surface";
-import { Lane, readRoute } from "./skate/lane";
-import { readRails } from "./skate/rails";
+import { Lane } from "./skate/lane";
+import { skateData } from "./skate/skateLevel";
 import type { SkateMover } from "./skate/SkateMover";
 
+const NO_RAILS: never[] = [];
 const IDLE_INPUT = { moveX: 0, moveZ: 0, run: false, jump: false, pop: false };
 
 const UP = new THREE.Vector3(0, 1, 0);
@@ -37,6 +38,7 @@ function startSkateLane(route: Lane | null, feet: THREE.Vector3, yaw: number) {
   lane.tangent(S.s, S.dir);
   S.speed = 0;
   S.active = true;
+  return yawForDirection(S.dir.x, S.dir.z);
 }
 
 function useSpawn() {
@@ -126,13 +128,10 @@ export function Hue() {
 
   const bodyRef = useRef<RapierRigidBody>(null);
   const colliderRef = useRef<RapierCollider>(null);
-  // A skateboard level's rails (`RAIL_nn` nodes in its model).
-  const rails = useMemo(() => (level.mode === "skate" ? readRails(roomScene) : []), [roomScene, level]);
-  // ... and its route (a `SKATE_ROUTE` node: the street's own line); without one the lane is straight from the spawn.
-  const route = useMemo(() => {
-    const pts = level.mode === "skate" ? readRoute(roomScene, level.skate?.route ?? "SKATE_ROUTE") : null;
-    return pts ? new Lane(pts) : null;
-  }, [roomScene, level]);
+  // A skateboard level: its route, rails and generated course, read from the loaded model once (skate/skateLevel.ts).
+  const skate = useMemo(() => (level.mode === "skate" ? skateData(roomScene, level) : null), [roomScene, level]);
+  const rails = skate?.rails ?? NO_RAILS;
+  const route = skate?.lane ?? null;
   const controller = useHueController(bodyRef, colliderRef, anim, rollCurve, climbRiseSpeed, topOut, rails, route);
 
   // First visible frame: a clip is bound, playing and evaluated, and the root is placed.
@@ -148,11 +147,10 @@ export function Hue() {
     });
 
     root.position.copy(startFeet);
-    root.rotation.set(0, spawn.yaw, 0);
+    root.rotation.set(0, level.mode === "skate" ? startSkateLane(route, startFeet, spawn.yaw) : spawn.yaw, 0);
     runtime.feet.copy(startFeet);
     runtime.startFeet.copy(startFeet);
     runtime.grounded = true;
-    if (level.mode === "skate") startSkateLane(route, startFeet, spawn.yaw);
 
     anim.snap(startClip);
     gltf.scene.visible = true;
@@ -268,7 +266,7 @@ export function Hue() {
     const mover = controller.get();
     if (mover && (phase === "playing" || phase === "won")) {
       const scripted = runtime.debug.input;
-      const input = scripted ? { moveX: scripted.x, moveZ: -scripted.z, run: scripted.run, jump: scripted.jump, pop: scripted.pop } : readInput();
+      const input = scripted ? { moveX: scripted.x, moveZ: -scripted.z, run: scripted.run, jump: scripted.jump, pop: scripted.pop, trick: scripted.trick } : readInput();
       mover.update(dt, phase === "playing" ? input : IDLE_INPUT);
       if (fallY.current === null && roomColliders.length) fallY.current = Math.min(...roomColliders.map((c) => c.center.y - c.halfExtents.y)) - 1;
       if (fallY.current !== null && mover.feet.y < fallY.current) {

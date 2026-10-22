@@ -243,7 +243,7 @@ export function prepareClips(
 
   const topOut = prepareTopOut(clips.climb_top, metresPerUnit);
 
-  for (const name of ["idle", "walk", "run", "jump_down", "jump_down_2", "fall_roll"] as const) {
+  for (const name of ["idle", "walk", "run", "jump_down", "jump_down_2", "fall_roll", "skate_push", "skate_ride"] as const) {
     stripHorizontal(clips[name]);
   }
   // Height comes from physics; keep the crouches (real knee bends on the ground).

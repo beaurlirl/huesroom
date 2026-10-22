@@ -77,11 +77,11 @@ export function TouchControls() {
             baseColor="rgba(0, 0, 0, 0)"
             stickColor="#0a0a0a"
             throttle={16}
-            move={(e) => useTouchInput.setState({ aimY: e.y ?? 0 })}
-            stop={() => useTouchInput.setState({ aimY: 0 })}
+            move={(e) => useTouchInput.setState({ aimX: e.x ?? 0, aimY: e.y ?? 0 })}
+            stop={() => useTouchInput.setState({ aimX: 0, aimY: 0 })}
           />
           <div className="pointer-events-none absolute left-0 right-0 text-center text-xs font-bold" style={{ top: -22, color: theme.ink }}>
-            flick to ollie
+            flick to ollie · lean to flip
           </div>
         </div>
       )}
